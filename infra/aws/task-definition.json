@@ -1,0 +1,40 @@
+{
+  "family": "resume-builder",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT:role/resumeBuilderTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "web",
+      "image": "ACCOUNT.dkr.ecr.REGION.amazonaws.com/resume-builder:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "ENV", "value": "prod" },
+        { "name": "DEPLOY_ENV", "value": "prod" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:resume-builder/prod/app:DATABASE_URL::" },
+        { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:resume-builder/prod/app:REDIS_URL::" },
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT:secret:resume-builder/prod/app:JWT_SECRET::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/resume-builder-prod",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "web"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3
+      }
+    }
+  ]
+}

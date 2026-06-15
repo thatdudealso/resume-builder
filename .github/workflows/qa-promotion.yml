@@ -1,0 +1,28 @@
+name: QA Promotion
+
+on:
+  pull_request:
+    branches: [qa]
+  push:
+    branches: [qa]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Full test suite
+        run: |
+          docker compose -f docker-compose.test.yml build test
+          docker compose -f docker-compose.test.yml up -d postgres redis
+          docker compose -f docker-compose.test.yml run --rm migrate
+          docker compose -f docker-compose.test.yml run --rm test
+
+      - name: Deploy to QA
+        if: github.event_name == 'push'
+        env:
+          DEPLOY_ENV: qa
+          GITHUB_SHA: ${{ github.sha }}
+        run: bash scripts/deploy/deploy-qa.sh

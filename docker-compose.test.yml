@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: resume
+      POSTGRES_PASSWORD: resume
+      POSTGRES_DB: resume_builder_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resume -d resume_builder_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    command: scripts/migrate.sh
+    environment:
+      DATABASE_URL: postgresql+asyncpg://resume:resume@postgres:5432/resume_builder_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      DATABASE_URL: postgresql+asyncpg://resume:resume@postgres:5432/resume_builder_test
+      REDIS_URL: redis://redis:6379/1
+      JWT_SECRET: test-secret-key-minimum-32-characters-long
+      ENV: test
+      HF_TOKEN: test
+      ANTHROPIC_API_KEY: test
+      STRIPE_SECRET_KEY: sk_test_fake
+      STRIPE_WEBHOOK_SECRET: whsec_test
+      NOWPAYMENTS_API_KEY: test
+      NOWPAYMENTS_IPN_SECRET: test
+      S3_ENDPOINT: http://localhost:9000
+      S3_BUCKET: test-bucket
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy

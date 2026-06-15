@@ -1,0 +1,21 @@
+name: Feature PR
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run test suite in Docker
+        run: |
+          docker compose -f docker-compose.test.yml build test
+          docker compose -f docker-compose.test.yml up -d postgres redis
+          docker compose -f docker-compose.test.yml run --rm migrate
+          docker compose -f docker-compose.test.yml run --rm test
+
+      - name: Docker build verify
+        run: docker build -t resume-builder:pr .

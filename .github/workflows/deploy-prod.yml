@@ -1,0 +1,40 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type deploy to confirm production deploy'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main' && github.event.inputs.confirm == 'deploy'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Forbidden paths guard
+        run: bash scripts/deploy/check-forbidden-paths.sh origin/main HEAD
+
+      - name: Run tests
+        run: |
+          docker compose -f docker-compose.test.yml up -d postgres redis
+          docker compose -f docker-compose.test.yml run --rm migrate
+          docker compose -f docker-compose.test.yml run --rm test
+
+      - name: Deploy production
+        env:
+          DEPLOY_ENV: prod
+          GITHUB_SHA: ${{ github.sha }}
+        run: bash scripts/deploy/deploy-prod.sh
+
+      - name: Smoke test
+        run: bash scripts/deploy/smoke_test.sh
+
+      - name: Rollback on failure
+        if: failure()
+        run: bash scripts/deploy/rollback.sh

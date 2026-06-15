@@ -1,0 +1,19 @@
+name: Migration Doc Check
+
+on:
+  pull_request:
+    branches: [develop, qa, main]
+    paths:
+      - 'migrations/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify table docs are current
+        run: |
+          docker compose -f docker-compose.test.yml up -d postgres
+          docker compose -f docker-compose.test.yml run --rm migrate
+          docker compose -f docker-compose.test.yml run --rm test scripts/db/verify_docs.sh
