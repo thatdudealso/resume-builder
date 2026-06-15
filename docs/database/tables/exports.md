@@ -11,7 +11,7 @@ Generated export files (TXT/DOCX/PDF).
 | `run_id` | UUID | False |
 | `format` | VARCHAR(10) | False |
 | `s3_key` | VARCHAR(512) | False |
-| `created_at` | DATETIME | False |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

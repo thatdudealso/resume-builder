@@ -13,7 +13,7 @@ On-chain payment details for crypto unlocks.
 | `pay_address` | VARCHAR(255) | True |
 | `tx_hash` | VARCHAR(255) | True |
 | `confirmations` | INTEGER | False |
-| `webhook_payload` | JSON | True |
+| `webhook_payload` | JSONB | True |
 
 ## Indexes
 

@@ -1,6 +1,6 @@
 # Resume Builder — Implementation Status
 
-**Last updated:** 2026-06-14  
+**Last updated:** 2026-06-15  
 **Integration branch:** `develop`  
 **Production branch:** `main` (promoted from `qa` only)
 
@@ -17,6 +17,7 @@
 | Test coverage gate | **85.42%** (89 tests) |
 | CI workflows | Committed (Docker CI unverified locally) |
 | AWS deploy artifacts | Skeleton only |
+| Database schema docs | Done on `feature/database-schema-export` |
 
 ## Plan todos
 
@@ -29,6 +30,7 @@
 | nicegui-ui | Upload, JD, stream, paywall, export | **Partial** | polish → `feature/nicegui-paywall-polish` |
 | payments | Stripe + NOWPayments | **Done** | |
 | exports-infra | Exports, S3, rate limit, headers | **Done** | |
+| database-schema-export | Generated schema SQL, ER docs, stale-doc CI | **Done** | `feature/database-schema-export` |
 | testing-ci | 85% gate, GHA workflows | **Partial** | Docker verify → `feature/docker-ci-verify` |
 | aws-deploy | ECS, RDS, ElastiCache, ALB | **Partial** | → `feature/aws-infra-full` |
 
@@ -42,7 +44,7 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | `feature/nicegui-paywall-polish` | Browser cookie auth, SSE UX, post-payment polling, device fingerprint JS |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix any image/test gaps |
 | `feature/aws-infra-full` | Terraform/CDK or documented IaC: RDS, ElastiCache, S3, ALB, Secrets Manager |
-| `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, verify_docs in CI |
+| `feature/database-schema-export` | Done: `docs/database/schema.sql`, ER diagram, verify_docs in CI |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate |
 | `feature/github-branch-protection` | Branch protection rules doc + optional `gh` setup script |
 

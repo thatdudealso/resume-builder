@@ -11,9 +11,9 @@ Uploaded master resume files and parsed text.
 | `filename` | VARCHAR(255) | False |
 | `s3_key` | VARCHAR(512) | False |
 | `raw_text` | TEXT | False |
-| `structured_json` | JSON | True |
+| `structured_json` | JSONB | True |
 | `is_free_trial_resume` | BOOLEAN | False |
-| `created_at` | DATETIME | False |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

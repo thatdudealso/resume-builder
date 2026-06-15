@@ -5,6 +5,9 @@ on:
     branches: [develop, qa, main]
     paths:
       - 'migrations/**'
+      - 'packages/db/models/**'
+      - 'scripts/db/**'
+      - 'docs/database/**'
 
 jobs:
   check:
@@ -16,4 +19,4 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml up -d postgres
           docker compose -f docker-compose.test.yml run --rm migrate
-          docker compose -f docker-compose.test.yml run --rm test scripts/db/verify_docs.sh
+          docker compose -f docker-compose.test.yml run --rm -v "$PWD:/app" test bash -lc "git config --global --add safe.directory /app && scripts/db/verify_docs.sh"

@@ -10,8 +10,8 @@ SSE and audit events per agent run.
 | `run_id` | UUID | False |
 | `node_name` | VARCHAR(50) | False |
 | `event_type` | VARCHAR(30) | False |
-| `payload` | JSON | False |
-| `created_at` | DATETIME | False |
+| `payload` | JSONB | False |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

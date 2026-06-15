@@ -9,9 +9,9 @@ Rotating refresh tokens for JWT auth.
 | `id` | UUID | False |
 | `user_id` | UUID | False |
 | `token_hash` | VARCHAR(64) | False |
-| `expires_at` | DATETIME | False |
-| `revoked_at` | DATETIME | True |
-| `created_at` | DATETIME | False |
+| `expires_at` | TIMESTAMP WITH TIME ZONE | False |
+| `revoked_at` | TIMESTAMP WITH TIME ZONE | True |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

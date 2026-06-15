@@ -10,9 +10,9 @@ Idempotent crypto webhook event log.
 | `provider_event_id` | VARCHAR(255) | False |
 | `payment_id` | UUID | True |
 | `event_type` | VARCHAR(50) | False |
-| `payload` | JSON | False |
-| `processed_at` | DATETIME | True |
-| `created_at` | DATETIME | False |
+| `payload` | JSONB | False |
+| `processed_at` | TIMESTAMP WITH TIME ZONE | True |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

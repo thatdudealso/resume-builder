@@ -11,8 +11,8 @@ Application users with free trial tracking.
 | `password_hash` | VARCHAR(255) | False |
 | `is_active` | BOOLEAN | False |
 | `free_trial_used` | BOOLEAN | False |
-| `created_at` | DATETIME | False |
-| `updated_at` | DATETIME | False |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

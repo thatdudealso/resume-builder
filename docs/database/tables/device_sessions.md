@@ -11,8 +11,8 @@ Device fingerprint and IP hash per login session.
 | `device_fingerprint` | VARCHAR(64) | False |
 | `ip_hash` | VARCHAR(64) | False |
 | `user_agent` | VARCHAR(512) | True |
-| `first_seen_at` | DATETIME | False |
-| `last_seen_at` | DATETIME | False |
+| `first_seen_at` | TIMESTAMP WITH TIME ZONE | False |
+| `last_seen_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 

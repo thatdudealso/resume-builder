@@ -1,6 +1,6 @@
 # Table: `payments`
 
-Unified Stripe and crypto one-time payments.
+Unified Stripe and crypto payment records that unlock paid runs.
 
 ## Columns
 
@@ -16,9 +16,9 @@ Unified Stripe and crypto one-time payments.
 | `currency` | VARCHAR(10) | False |
 | `status` | VARCHAR(20) | False |
 | `unlocks_uploads` | BOOLEAN | False |
-| `metadata` | JSON | True |
-| `confirmed_at` | DATETIME | True |
-| `created_at` | DATETIME | False |
+| `metadata` | JSONB | True |
+| `confirmed_at` | TIMESTAMP WITH TIME ZONE | True |
+| `created_at` | TIMESTAMP WITH TIME ZONE | False |
 
 ## Indexes
 
@@ -26,8 +26,8 @@ Unified Stripe and crypto one-time payments.
 
 ## Foreign Keys
 
-- `user_id` → `users.id`
 - `run_id` → `agent_runs.id`
+- `user_id` → `users.id`
 
 ## Example Query
 
