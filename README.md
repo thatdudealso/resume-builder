@@ -37,6 +37,13 @@ docker compose -f docker-compose.test.yml run --rm test
 
 - `develop` — active development (private deploy)
 - `qa` — pre-production (private deploy)
-- `main` — production only (public)
+- `main` — production only (public app URL)
 
-See `docs/dev/cursor.md` on non-main branches for agent context.
+**GitHub:** private repo; engineering plan and status live on `develop` under `docs/dev/plans/`.
+
+```bash
+git checkout develop
+# Read docs/dev/plans/STATUS.md for current status and feature branches
+```
+
+Feature work: branch from `develop` as `feature/<name>`, open PR → `develop`.
