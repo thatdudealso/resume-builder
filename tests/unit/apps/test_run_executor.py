@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock
+
 import pytest
 
 from apps.web.services.run_executor import execute_run
@@ -30,7 +33,7 @@ async def test_execute_run_completes(session, monkeypatch):
     session.add(run)
     await session.commit()
 
-    async def fake_run_agent(initial, llm_complete):
+    async def fake_run_agent(initial, llm_complete, *, checkpointer=None):
         return {
             "final_output": {"plain_text": "Tailored resume output."},
             "preview_text": "Tailored resume output.",
@@ -39,7 +42,14 @@ async def test_execute_run_completes(session, monkeypatch):
             "validation_passed": True,
         }
 
+    mock_checkpointer = AsyncMock()
+
+    @asynccontextmanager
+    async def fake_get_checkpointer(database_url):
+        yield mock_checkpointer
+
     monkeypatch.setattr("apps.web.services.run_executor.run_agent", fake_run_agent)
+    monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_checkpointer)
     await execute_run(session, run.id)
     await session.refresh(run)
     assert run.status == "completed"
