@@ -4,31 +4,31 @@ overview: "Production architecture for Resume Builder: modular Python monorepo, 
 todos:
   - id: branch-scaffold
     content: Initialize repo with main/develop/qa branches, branch protection rules, forbidden-paths CI guard, and docs/dev/ agent files (claude.md, codex.md, cursor.md, plans/) on non-main branches only
-    status: pending
+    status: completed
   - id: scaffold-monorepo
     content: "Scaffold modular Python monorepo on develop: pyproject.toml, apps/web, packages/*, Docker Compose with postgres/redis/migrate/web"
-    status: pending
+    status: completed
   - id: auth-access
     content: JWT httpOnly auth, device/IP session binding, users/access_grants/payments schema, Alembic migrations + table doc generator
-    status: pending
+    status: completed
   - id: langgraph-agent
     content: Lean LangGraph graph (4 nodes), HF for rewrite+validate only, Claude fallback, SSE streaming, paywall-locked runs
-    status: pending
+    status: in_progress
   - id: nicegui-ui
     content: NiceGUI on FastAPI at /app; upload, JD input, blurred locked output, paywall modal, post-payment reveal, export
-    status: pending
+    status: in_progress
   - id: payments
     content: Stripe Checkout one-time + NOWPayments crypto per-run; webhooks unlock run output via unified AccessService
-    status: pending
+    status: completed
   - id: exports-infra
     content: TXT/DOCX/PDF export post-payment, S3 storage, Redis rate limiting, security middleware
-    status: pending
+    status: completed
   - id: testing-ci
     content: pytest 85% gate in Docker; PR/feature/qa/main workflows; deployment scripts with smoke tests and GitHub Deployments API
-    status: pending
+    status: in_progress
   - id: aws-deploy
     content: ECS Fargate prod (main) + private QA/develop environments; RDS, ElastiCache, S3, ALB IP restrictions for non-prod
-    status: pending
+    status: in_progress
 isProject: false
 ---
 
