@@ -39,5 +39,5 @@ if settings.env not in ("test",):
 
     from apps.web.ui import app as ui_pages
 
-    ui_pages.register_ui()
+    ui_pages.mount_ui()
     ui.run_with(app, mount_path="/app", title="Resume Builder", storage_secret=settings.jwt_secret)

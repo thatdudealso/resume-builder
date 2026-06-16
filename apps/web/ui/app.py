@@ -167,40 +167,11 @@ def _install_page_shell() -> None:
               document.cookie = `rb_device_fingerprint=${encodeURIComponent(value)}; `
                 + 'path=/; max-age=31536000; samesite=lax';
               return value;
-            },
-            async auth(path, body) {
-              const response = await fetch(path, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Device-Fingerprint': this.get()
-                },
-                body: JSON.stringify(body)
-              });
-              let payload = {};
-              try { payload = await response.json(); } catch (error) {}
-              return { ok: response.ok, status: response.status, payload };
-            },
-            async logout() {
-              await fetch('/api/v1/auth/logout', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'X-Device-Fingerprint': this.get() }
-              });
-              window.location.href = '/app/';
             }
           };
+          window.rbFingerprint.get();
         </script>
         """
-    )
-
-
-async def _auth_request(path: str, email: str | None, password: str | None) -> dict[str, Any]:
-    payload = {"email": (email or "").strip(), "password": password or ""}
-    return await ui.run_javascript(
-        f"return await window.rbFingerprint.auth({json.dumps(path)}, {json.dumps(payload)});",
-        timeout=20.0,
     )
 
 
@@ -209,7 +180,6 @@ def index_page() -> None:
     _install_page_shell()
     request = _request()
     query = request.query_params if request is not None else {}
-    is_signed_in = bool(request and request.cookies.get("access_token"))
     paid_return = query.get("paid") == "1" and bool(query.get("run_id"))
 
     state: dict[str, Any] = {
@@ -222,20 +192,13 @@ def index_page() -> None:
         with ui.column().classes("rb-shell gap-5"):
             with ui.row().classes("rb-header items-center justify-between w-full"):
                 ui.label("Resume Builder").classes("rb-wordmark")
-
-                async def do_logout() -> None:
-                    await ui.run_javascript("await window.rbFingerprint.logout();", timeout=10.0)
-
-                if is_signed_in:
-                    ui.button("Sign out", icon="logout", on_click=do_logout).props("flat")
-                else:
-                    ui.label("No separate login or dashboard pages").classes("rb-subtle")
+                ui.label("One private device workspace.").classes("rb-subtle")
 
             with ui.column().classes("gap-3"):
                 ui.label("Tailor your resume without inventing facts.").classes("rb-title")
                 ui.label(
-                    "Upload a master resume, paste one job description, stream progress, "
-                    "unlock paid output when required, and export from this single workspace."
+                    "Upload a master resume, paste one job description, stream progress, unlock "
+                    "paid output when required, and export from one private workspace."
                 ).classes("rb-copy")
 
             with ui.row().classes("rb-proof"):
@@ -253,77 +216,27 @@ def index_page() -> None:
 
             with ui.element("section").classes("rb-grid w-full"):
                 with ui.column().classes("rb-panel gap-4"):
-                    if is_signed_in:
-                        ui.label("Inputs").classes("rb-section-title")
-                        status_label = ui.label("Loading account...").classes("rb-subtle")
-                        resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
-                        upload_status = ui.label("").classes("text-sm")
-                        upload = ui.upload(auto_upload=True).props(
-                            "accept=.pdf,.txt,.docx"
-                        ).classes("w-full")
-                        jd_input = ui.textarea("Job description").props("outlined").classes(
-                            "w-full"
-                        )
-                        jd_input.props("autogrow")
-                        run_button = ui.button("Tailor resume", icon="auto_awesome").props(
-                            "unelevated"
-                        )
-                        progress_label = ui.label("Ready").classes("rb-subtle")
-                        progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
-                    else:
-                        ui.label("Start here").classes("rb-section-title")
-                        ui.label(
-                            "Create an account or sign in, then this same page becomes the "
-                            "resume workspace."
-                        ).classes("rb-subtle")
-                        mode = ui.toggle(["Create", "Sign in"], value="Create").props(
-                            "unelevated"
-                        )
-                        email = ui.input("Email").props("outlined dense").classes("w-full")
-                        password = ui.input(
-                            "Password", password=True
-                        ).props("outlined dense").classes("w-full")
-                        auth_error = ui.label("").classes("rb-danger text-sm")
-
-                        async def submit_auth() -> None:
-                            endpoint = (
-                                "/api/v1/auth/register"
-                                if mode.value == "Create"
-                                else "/api/v1/auth/login"
-                            )
-                            result = await _auth_request(endpoint, email.value, password.value)
-                            if result.get("ok"):
-                                await ui.run_javascript(
-                                    "window.location.href = '/app/';", timeout=5.0
-                                )
-                                return
-                            fallback = (
-                                "Could not create account"
-                                if mode.value == "Create"
-                                else "Login failed"
-                            )
-                            detail = result.get("payload", {}).get("detail", fallback)
-                            auth_error.set_text(str(detail))
-
-                        ui.button(
-                            "Continue",
-                            icon="arrow_forward",
-                            on_click=submit_auth,
-                        ).props("unelevated").classes("w-full")
-                        ui.separator()
-                        ui.label("Workspace preview").classes("font-medium")
-                        ui.label("Upload, tailoring, paywall, and exports all live here.").classes(
-                            "rb-subtle"
-                        )
+                    ui.label("Inputs").classes("rb-section-title")
+                    status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
+                    resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
+                    upload_status = ui.label("").classes("text-sm")
+                    upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
+                        "w-full"
+                    )
+                    jd_input = ui.textarea("Job description").props("outlined").classes("w-full")
+                    jd_input.props("autogrow")
+                    run_button = ui.button("Tailor resume", icon="auto_awesome").props(
+                        "unelevated"
+                    )
+                    progress_label = ui.label("Ready").classes("rb-subtle")
+                    progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
 
                 with ui.column().classes("gap-4").style("min-width: 0;"):
                     with ui.row().classes("items-center justify-between w-full"):
                         ui.label("Output").classes("rb-section-title")
                         export_row = ui.row().classes("gap-2 hidden")
                     output = ui.markdown(
-                        "Sign in on this page to upload a resume and start a tailored run."
-                        if not is_signed_in
-                        else "Upload a resume, paste a job description, then start a tailored run."
+                        "Upload a resume, paste a job description, then start a tailored run."
                     ).classes("rb-panel rb-output w-full")
                     payment_status = ui.label("").classes("rb-subtle")
 
@@ -338,10 +251,6 @@ def index_page() -> None:
             crypto_button = ui.button("Crypto", icon="currency_bitcoin").props("outline")
         crypto_status = ui.label("").classes("rb-subtle")
 
-    if not is_signed_in:
-        ui.timer(0.1, lambda: ui.run_javascript("window.rbFingerprint.get();"), once=True)
-        return
-
     async def load_account() -> None:
         async with api_client() as client:
             user_resp = await client.get("/api/v1/auth/me")
@@ -349,8 +258,8 @@ def index_page() -> None:
             resumes_resp = await client.get("/api/v1/resumes")
 
         if user_resp.status_code != 200:
-            status_label.set_text("Session expired. Sign in again on this page.")
-            output.set_content("Refresh this page to sign in again.")
+            status_label.set_text("Device workspace unavailable. Refresh this page.")
+            output.set_content("Could not prepare the local device workspace.")
             return
 
         user = user_resp.json()
@@ -573,5 +482,5 @@ def index_page() -> None:
         ui.timer(0.2, lambda: refresh_run(show_paywall=state["poll_payment"]), once=True)
 
 
-def register_ui() -> None:
+def mount_ui() -> None:
     pass

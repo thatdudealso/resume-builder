@@ -28,7 +28,7 @@
 | auth-access | JWT, migrations, AccessService | **Done** | |
 | langgraph-agent | 4-node graph, HF, SSE | **Done** | |
 | langgraph-checkpointer | AsyncPostgresSaver wired into graph + run_executor | **PR #2 open** | `feature/langgraph-postgres-checkpointer` → develop |
-| nicegui-ui | Single `/app/` page, browser auth, upload, SSE, paywall, post-payment polling, export gating | **Built** | `feature/nicegui-paywall-polish`; PR pending |
+| nicegui-ui | Single `/app/` page, device workspace, upload, SSE, paywall, post-payment polling, export gating | **Built** | `feature/nicegui-paywall-polish`; PR pending |
 | payments | Stripe + NOWPayments | **Done** | |
 | exports-infra | Exports, S3, rate limit, headers | **Done** | |
 | testing-ci | 85% gate, GHA workflows | **Partial** | Docker verify → `feature/docker-ci-verify` |
@@ -44,7 +44,7 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | Branch | Scope | Status |
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | `AsyncPostgresSaver` wired into `build_graph` / `run_agent` / `execute_run`; `get_checkpointer()` util; 6 new tests | **PR #2 open** |
-| `feature/nicegui-paywall-polish` | Single `/app/` workflow, browser cookie auth, SSE UX, post-payment polling, device fingerprint JS | Built; browser smoke passed |
+| `feature/nicegui-paywall-polish` | Single `/app/` workflow, no login/account UI, SSE UX, post-payment polling, device fingerprint JS | Built; browser smoke passed |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql` export, ER diagram, `verify_docs` CI check | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |

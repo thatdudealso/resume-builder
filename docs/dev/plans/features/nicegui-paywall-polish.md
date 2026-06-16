@@ -2,33 +2,31 @@
 
 ## Goal
 
-Production-quality NiceGUI UX for auth, streaming, paywall, and post-payment unlock.
+Production-quality NiceGUI UX for one-page device workspace, streaming, paywall, and post-payment unlock.
 
 ## Tasks
 
-- [x] Set auth cookies in browser (form POST or `run_javascript` fetch with `credentials: 'include'`)
+- [x] Create/reuse device workspace without user-facing login or registration
 - [x] Live SSE progress on the home page (replace fixed sleep)
 - [x] Poll billing/run status after Stripe return (`?paid=1`)
 - [x] Client-side device fingerprint header on all API calls
 - [x] Blur + paywall modal until webhook confirms payment
 - [x] Show export buttons only when `can_view_output` is true
-- [x] Build functional single-page `/app/` workflow with register/sign-in entrypoint
+- [x] Build functional single-page `/app/` workflow with no login or account UI
 
 ## Acceptance
 
-User can register, upload, tailor, pay, see full output, and export without manual API calls.
+User can upload, tailor, pay, see full output, and export without login, account creation, or manual API calls.
 
 ## Implementation Notes
 
 - Rebuilt `apps/web/ui/app.py` as a minimal task-first NiceGUI workflow.
 - Kept the complete product flow on the `/app/` home page. There are no
-  NiceGUI `/login`, `/register`, or `/dashboard` pages.
-- Added an embedded create/sign-in form on the home page; successful auth reloads
-  `/app/` into the authenticated workspace.
-- Browser-side auth uses `fetch(..., credentials: 'include')` so backend httpOnly
-  cookies are set on the real browser session.
+  NiceGUI login, registration, dashboard, account, password, or logout flows.
+- The home page creates or reuses a private device workspace from
+  `rb_device_fingerprint`; there is no user-facing auth step.
 - A stable `rb_device_fingerprint` cookie is generated in-browser and sent as
-  `X-Device-Fingerprint` by browser auth and the server-side UI API client.
+  `X-Device-Fingerprint` by the server-side UI API client.
 - The home page streams `/api/v1/runs/{run_id}/stream`, updates progress by graph
   node, and loads the final run payload from `/api/v1/runs/{run_id}`.
 - Locked runs show only `preview_text`, apply a blur class, and open the paywall

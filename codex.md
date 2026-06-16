@@ -16,20 +16,23 @@ Use it before changing code, opening PRs, or updating generated documentation.
 ## Frontend Rules
 
 - Keep the NiceGUI app minimal, focused, and operational; do not build a marketing page.
-- Build one user-facing NiceGUI page at `/app/`. Do not add `/login`,
-  `/register`, `/dashboard`, or other product pages.
-- Keep auth, upload, job-description input, streaming status, locked preview,
+- Build one user-facing NiceGUI page at `/app/`. Do not add login,
+  registration, dashboard, account, or other product pages.
+- Never add user-facing login, registration, logout, password, or account-creation
+  functionality. The frontend uses an automatic private device workspace.
+- Keep upload, job-description input, streaming status, locked preview,
   paywall actions, payment return polling, and exports on that home page.
 - Use the backend API contracts in `apps/web/api/v1/**` instead of duplicating business logic.
-- Login and registration must happen in the browser with `credentials: 'include'` so httpOnly cookies are stored correctly.
-- Send `X-Device-Fingerprint` on auth, upload, run, billing, and export calls.
+- Set and reuse a stable `rb_device_fingerprint` cookie, then send
+  `X-Device-Fingerprint` on upload, run, billing, and export calls.
 - Hide export controls until the run response includes viewable output.
 - Do not display `final_output` when `agent_runs.output_locked=true`; show only `preview_text` and the paywall.
 - Poll run status after Stripe or crypto payment until the webhook unlocks the run.
 
 ## Backend Coordination
 
-- Auth cookies are set by `/api/v1/auth/register`, `/api/v1/auth/login`, and `/api/v1/auth/refresh`.
+- Protected APIs create or reuse the private device workspace from
+  `X-Device-Fingerprint` when no token is present.
 - Resume upload is `/api/v1/resumes`; only the first upload is free without confirmed payment.
 - Run creation is `/api/v1/runs`; progress streams from `/api/v1/runs/{run_id}/stream`.
 - Locked output is revealed only after `AccessService.unlock_run()` changes the run state.
