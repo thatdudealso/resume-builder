@@ -29,12 +29,13 @@ def event_loop():
 
 @pytest_asyncio.fixture
 async def engine():
-    engine = create_async_engine(
-        os.environ["DATABASE_URL"],
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    db_url = os.environ["DATABASE_URL"]
+    is_sqlite = db_url.startswith("sqlite")
+    kwargs: dict[str, object] = {"echo": False}
+    if is_sqlite:
+        kwargs["connect_args"] = {"check_same_thread": False}
+        kwargs["poolclass"] = StaticPool
+    engine = create_async_engine(db_url, **kwargs)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
