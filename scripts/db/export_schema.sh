@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 OUT="${1:-docs/database/schema.sql}"
 DATABASE_URL="${DATABASE_URL:-postgresql://resume:resume@localhost:5432/resume_builder}"
 SYNC_URL="${DATABASE_URL/postgresql+asyncpg/postgresql}"
