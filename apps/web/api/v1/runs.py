@@ -6,7 +6,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
@@ -144,7 +143,7 @@ async def unlock_run(
         return {"already_unlocked": True}
     return {
         "run_id": str(run_id),
-        "stripe_checkout": f"/api/v1/billing/stripe/checkout",
-        "crypto_invoice": f"/api/v1/billing/crypto/invoice",
+        "stripe_checkout": "/api/v1/billing/stripe/checkout",
+        "crypto_invoice": "/api/v1/billing/crypto/invoice",
         "price_usd": 9.99,
     }

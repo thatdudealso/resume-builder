@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from packages.agent.checkpointer import _to_psycopg_dsn, get_checkpointer
 
@@ -25,7 +26,10 @@ async def test_get_checkpointer_calls_setup():
     mock_cm.__aenter__ = AsyncMock(return_value=mock_checkpointer)
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("packages.agent.checkpointer.AsyncPostgresSaver.from_conn_string", return_value=mock_cm):
+    with patch(
+        "packages.agent.checkpointer.AsyncPostgresSaver.from_conn_string",
+        return_value=mock_cm,
+    ):
         async with get_checkpointer("postgresql+asyncpg://u:p@localhost/db") as cp:
             assert cp is mock_checkpointer
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from packages.export.docx_export import export_docx, export_txt
 from packages.export.pdf_ingest import extract_text_from_upload
 from packages.integrations.crypto.nowpayments import verify_ipn_signature

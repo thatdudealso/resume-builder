@@ -11,6 +11,7 @@ async def test_execute_run_missing_resume(session):
     user = await register_user(session, "missing@test.com", "password123")
     await session.flush()
     from uuid import uuid4
+
     from packages.db.models.agent_run import AgentRun
 
     run = AgentRun(

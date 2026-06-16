@@ -58,7 +58,6 @@ async def test_paywall_flow(client, monkeypatch):
     )
     assert run1.status_code == 200
     assert run1.json()["output_locked"] is False
-    run1_id = run1.json()["run_id"]
 
     import asyncio
 

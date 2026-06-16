@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
@@ -51,7 +51,11 @@ def build_graph(
     graph.add_node("validate_output", validate_node)
     graph.add_node("format_output", format_node)
     graph.set_entry_point("prepare_inputs")
-    graph.add_conditional_edges("prepare_inputs", _after_prepare, {"rewrite_sections": "rewrite_sections", END: END})
+    graph.add_conditional_edges(
+        "prepare_inputs",
+        _after_prepare,
+        {"rewrite_sections": "rewrite_sections", END: END},
+    )
     graph.add_edge("rewrite_sections", "validate_output")
     graph.add_conditional_edges(
         "validate_output",

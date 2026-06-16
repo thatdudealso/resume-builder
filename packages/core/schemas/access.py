@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel
 
 
-class RunAccessMode(str, Enum):
+class RunAccessMode(StrEnum):
     FREE = "free"
     LOCKED = "locked"
     BLOCKED = "blocked"

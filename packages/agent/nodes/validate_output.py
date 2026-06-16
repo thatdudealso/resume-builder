@@ -22,8 +22,9 @@ async def validate_output(state: AgentState, llm_complete) -> AgentState:
     errors = _rule_validate(source, draft)
     if not errors:
         prompt = (
-            "Does the draft introduce employers, degrees, or metrics not supported by the source resume? "
-            "Answer ONLY yes or no.\n"
+            "Does the draft introduce employers, degrees, or metrics"
+            " not supported by the source resume?"
+            " Answer ONLY yes or no.\n"
             f"Source:\n{source[:4000]}\nDraft:\n{draft[:4000]}"
         )
         answer = await llm_complete(

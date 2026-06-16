@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -77,8 +76,9 @@ async def test_health_degraded(client, monkeypatch):
         raise ConnectionError("down")
 
     monkeypatch.setattr("apps.web.api.v1.health.get_redis", fail_redis)
-    from apps.web.main import create_app
     from httpx import ASGITransport, AsyncClient
+
+    from apps.web.main import create_app
 
     app = create_app()
     transport = ASGITransport(app=app)

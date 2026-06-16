@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import json
 from decimal import Decimal
-from uuid import UUID
 
 import pytest
 

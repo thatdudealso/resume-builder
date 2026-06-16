@@ -79,6 +79,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# SQLAlchemy ORM uses string-based forward references in relationship() that
+# ruff cannot resolve across modules — F821 false positives on all model files.
+"packages/db/models/*.py" = ["F821"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

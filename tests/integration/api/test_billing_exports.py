@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 
 import pytest
 
@@ -41,7 +40,7 @@ async def test_locked_export_returns_402(client, monkeypatch):
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python " * 10},
     )
-    runs = await client.get("/api/v1/resumes")
+    await client.get("/api/v1/resumes")
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Java " * 10},

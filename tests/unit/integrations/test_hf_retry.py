@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 import respx
-import httpx
 
 from packages.integrations.hf_inference import complete
 

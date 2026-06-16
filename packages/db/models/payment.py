@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from packages.db.base import Base, JsonType, new_uuid
@@ -18,7 +18,9 @@ class Payment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
-    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_runs.id"))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_runs.id")
+    )
     provider: Mapped[str] = mapped_column(String(20), nullable=False)
     provider_payment_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -30,8 +32,8 @@ class Payment(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    user: Mapped["User"] = relationship(back_populates="payments")
-    run: Mapped["AgentRun | None"] = relationship(
+    user: Mapped[User] = relationship(back_populates="payments")
+    run: Mapped[AgentRun | None] = relationship(
         back_populates="payment", foreign_keys="AgentRun.payment_id"
     )
-    crypto_detail: Mapped["CryptoPayment | None"] = relationship(back_populates="payment")
+    crypto_detail: Mapped[CryptoPayment | None] = relationship(back_populates="payment")

@@ -16,8 +16,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("NOWPAYMENTS_API_KEY", "test")
 
-from packages.db.base import Base
 import packages.db.models  # noqa: F401
+from packages.db.base import Base
 
 
 @pytest.fixture(scope="session")
@@ -51,9 +51,9 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(engine, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
+    import packages.db.session as db_session
     from apps.web import dependencies as deps
     from apps.web.main import create_app
-    import packages.db.session as db_session
 
     app = create_app()
 

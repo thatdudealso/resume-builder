@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from packages.core.security.jwt import create_access_token, create_refresh_token, register_user, rotate_refresh_token
+from packages.core.security.jwt import (
+    create_refresh_token,
+    register_user,
+    rotate_refresh_token,
+)
 
 
 @pytest.mark.asyncio

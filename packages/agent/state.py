@@ -54,7 +54,9 @@ def split_sections(text: str) -> dict[str, str]:
 
 def extract_keywords(jd_text: str) -> list[str]:
     words = re.findall(r"[A-Za-z][A-Za-z0-9+#./-]{1,}", jd_text.lower())
-    stop = {"and", "the", "with", "for", "you", "will", "our", "are", "this", "that", "from", "have"}
+    stop = {
+        "and", "the", "with", "for", "you", "will", "our", "are", "this", "that", "from", "have"
+    }
     freq: dict[str, int] = {}
     for w in words:
         if len(w) < 3 or w in stop:

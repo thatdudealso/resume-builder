@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +21,6 @@ from packages.core.security.jwt import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from packages.core.security.sanitization import sanitize_text
 from packages.db.models.device_session import DeviceSession
 from packages.db.models.resume import MasterResume
 from packages.db.models.user import User

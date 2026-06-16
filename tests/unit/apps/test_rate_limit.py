@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import pytest
-
-from apps.web.middleware.rate_limit import RateLimitMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+from apps.web.middleware.rate_limit import RateLimitMiddleware
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,13 @@ async def test_rate_limit_allows_requests(monkeypatch):
     async def call_next(request):
         return Response("ok")
 
-    scope = {"type": "http", "method": "GET", "path": "/api/v1/auth/me", "headers": [], "client": ("127.0.0.1", 1234)}
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v1/auth/me",
+        "headers": [],
+        "client": ("127.0.0.1", 1234),
+    }
     request = Request(scope)
     response = await mw.dispatch(request, call_next)
     assert response.status_code == 200

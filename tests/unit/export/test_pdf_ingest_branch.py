@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from packages.export.pdf_ingest import extract_text_from_upload
 
 

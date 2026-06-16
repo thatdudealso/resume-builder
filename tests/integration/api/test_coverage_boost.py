@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 from decimal import Decimal
 from uuid import uuid4
 
@@ -81,8 +80,9 @@ async def test_export_locked_and_download(client, monkeypatch):
     )
     run_id = run.json()["run_id"]
 
-    import packages.db.session as db_session
     from uuid import UUID
+
+    import packages.db.session as db_session
 
     async with db_session.SessionLocal() as s:
         from packages.db.models.agent_run import AgentRun
