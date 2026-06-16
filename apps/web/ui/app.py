@@ -6,7 +6,7 @@ from typing import Any
 from nicegui import ui
 from nicegui.storage import request_contextvar
 
-from apps.web.ui.auth_guard import api_client, require_auth
+from apps.web.ui.auth_guard import api_client
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -48,94 +48,65 @@ def _install_page_shell() -> None:
           }
           .rb-page {
             min-height: 100vh;
-            padding: 32px;
+            padding: 28px;
           }
           .rb-shell {
             width: min(1180px, 100%);
             margin: 0 auto;
           }
-          .rb-landing {
-            min-height: 100vh;
-            padding: 28px;
-          }
-          .rb-landing-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 420px;
-            gap: 28px;
-            align-items: center;
-            min-height: calc(100vh - 56px);
-          }
-          .rb-auth {
-            width: min(420px, calc(100vw - 32px));
-            margin: 12vh auto 0;
+          .rb-header {
+            padding: 10px 0 22px;
           }
           .rb-title {
-            font-size: 28px;
-            line-height: 1.15;
+            font-size: clamp(36px, 6vw, 68px);
+            line-height: 0.98;
+            font-weight: 680;
+            letter-spacing: -0.04em;
+            max-width: 760px;
+          }
+          .rb-section-title {
+            font-size: 20px;
+            line-height: 1.2;
             font-weight: 650;
-            letter-spacing: 0;
+          }
+          .rb-wordmark {
+            font-size: 14px;
+            font-weight: 680;
           }
           .rb-subtle {
             color: var(--rb-muted);
             font-size: 14px;
+            line-height: 1.5;
+          }
+          .rb-copy {
+            color: var(--rb-muted);
+            font-size: 17px;
+            line-height: 1.55;
+            max-width: 620px;
+          }
+          .rb-grid {
+            display: grid;
+            grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
           }
           .rb-panel {
             background: var(--rb-panel);
             border: 1px solid var(--rb-line);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 18px;
           }
           .rb-soft {
             background: var(--rb-soft);
             border: 1px solid #d6e6dd;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 12px 14px;
           }
           .rb-output {
-            min-height: 360px;
+            min-height: 410px;
             max-height: 62vh;
             overflow: auto;
             white-space: normal;
-          }
-          .rb-wordmark {
-            font-size: 14px;
-            font-weight: 650;
-            letter-spacing: 0;
-          }
-          .rb-hero-title {
-            font-size: clamp(40px, 6vw, 72px);
-            line-height: 0.95;
-            font-weight: 680;
-            letter-spacing: 0;
-            max-width: 780px;
-          }
-          .rb-hero-copy {
-            color: var(--rb-muted);
-            font-size: 18px;
-            line-height: 1.55;
-            max-width: 620px;
-          }
-          .rb-step {
-            display: grid;
-            grid-template-columns: 40px minmax(0, 1fr);
-            gap: 12px;
-            align-items: start;
-          }
-          .rb-step-number {
-            width: 32px;
-            height: 32px;
-            border-radius: 999px;
-            display: grid;
-            place-items: center;
-            background: var(--rb-soft);
-            color: var(--rb-accent);
-            font-weight: 650;
-          }
-          .rb-proof {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 12px;
-            max-width: 640px;
           }
           .rb-locked {
             filter: blur(3px);
@@ -147,6 +118,11 @@ def _install_page_shell() -> None:
           .rb-success {
             color: #2f6f5f;
           }
+          .rb-proof {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+          }
           .q-field__control,
           .q-textarea .q-field__control {
             border-radius: 8px;
@@ -157,18 +133,11 @@ def _install_page_shell() -> None:
           .text-primary {
             color: var(--rb-accent) !important;
           }
-          @media (max-width: 820px) {
+          @media (max-width: 900px) {
             .rb-page {
               padding: 18px;
             }
-            .rb-landing {
-              padding: 18px;
-            }
-            .rb-landing-grid {
-              grid-template-columns: 1fr;
-              min-height: auto;
-              align-items: start;
-            }
+            .rb-grid,
             .rb-proof {
               grid-template-columns: 1fr;
             }
@@ -219,7 +188,7 @@ def _install_page_shell() -> None:
                 credentials: 'include',
                 headers: { 'X-Device-Fingerprint': this.get() }
               });
-              window.location.href = '/app/login';
+              window.location.href = '/app/';
             }
           };
         </script>
@@ -235,101 +204,78 @@ async def _auth_request(path: str, email: str | None, password: str | None) -> d
     )
 
 
-def _auth_layout(title: str, subtitle: str) -> tuple[Any, Any, Any, Any]:
-    with ui.column().classes("rb-auth gap-5"):
-        with ui.column().classes("gap-1"):
-            ui.label("Resume Builder").classes("rb-title")
-            ui.label(subtitle).classes("rb-subtle")
-        with ui.column().classes("rb-panel gap-4 w-full"):
-            ui.label(title).classes("text-lg font-medium")
-            email = ui.input("Email").props("outlined dense").classes("w-full")
-            password = ui.input("Password", password=True).props("outlined dense").classes("w-full")
-            error = ui.label("").classes("rb-danger text-sm")
-            button_row = ui.row().classes("items-center justify-between w-full")
-    return email, password, error, button_row
-
-
 @ui.page("/")
 def index_page() -> None:
     _install_page_shell()
     request = _request()
+    query = request.query_params if request is not None else {}
     is_signed_in = bool(request and request.cookies.get("access_token"))
+    paid_return = query.get("paid") == "1" and bool(query.get("run_id"))
 
-    with ui.column().classes("rb-landing"):
-        with ui.column().classes("rb-shell gap-8"):
-            with ui.row().classes("items-center justify-between w-full"):
+    state: dict[str, Any] = {
+        "run_id": query.get("run_id"),
+        "payment_id": None,
+        "poll_payment": paid_return,
+    }
+
+    with ui.column().classes("rb-page"):
+        with ui.column().classes("rb-shell gap-5"):
+            with ui.row().classes("rb-header items-center justify-between w-full"):
                 ui.label("Resume Builder").classes("rb-wordmark")
-                with ui.row().classes("gap-2"):
-                    if is_signed_in:
-                        ui.button("Dashboard", icon="dashboard").props("flat").on_click(
-                            lambda: ui.navigate.to("/dashboard")
-                        )
-                    else:
-                        ui.button("Sign in", icon="login").props("flat").on_click(
-                            lambda: ui.navigate.to("/login")
-                        )
 
-            with ui.element("section").classes("rb-landing-grid"):
-                with ui.column().classes("gap-7"):
-                    with ui.column().classes("gap-4"):
-                        ui.label("Tailor your resume without inventing facts.").classes(
-                            "rb-hero-title"
+                async def do_logout() -> None:
+                    await ui.run_javascript("await window.rbFingerprint.logout();", timeout=10.0)
+
+                if is_signed_in:
+                    ui.button("Sign out", icon="logout", on_click=do_logout).props("flat")
+                else:
+                    ui.label("No separate login or dashboard pages").classes("rb-subtle")
+
+            with ui.column().classes("gap-3"):
+                ui.label("Tailor your resume without inventing facts.").classes("rb-title")
+                ui.label(
+                    "Upload a master resume, paste one job description, stream progress, "
+                    "unlock paid output when required, and export from this single workspace."
+                ).classes("rb-copy")
+
+            with ui.row().classes("rb-proof"):
+                with ui.column().classes("rb-soft gap-1"):
+                    ui.label("1. Upload").classes("font-medium")
+                    ui.label("PDF, DOCX, or TXT master resume.").classes("rb-subtle")
+                with ui.column().classes("rb-soft gap-1"):
+                    ui.label("2. Tailor").classes("font-medium")
+                    ui.label("Live SSE progress from the agent graph.").classes("rb-subtle")
+                with ui.column().classes("rb-soft gap-1"):
+                    ui.label("3. Unlock").classes("font-medium")
+                    ui.label("Pay only when output is locked after the free run.").classes(
+                        "rb-subtle"
+                    )
+
+            with ui.element("section").classes("rb-grid w-full"):
+                with ui.column().classes("rb-panel gap-4"):
+                    if is_signed_in:
+                        ui.label("Inputs").classes("rb-section-title")
+                        status_label = ui.label("Loading account...").classes("rb-subtle")
+                        resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
+                        upload_status = ui.label("").classes("text-sm")
+                        upload = ui.upload(auto_upload=True).props(
+                            "accept=.pdf,.txt,.docx"
+                        ).classes("w-full")
+                        jd_input = ui.textarea("Job description").props("outlined").classes(
+                            "w-full"
                         )
+                        jd_input.props("autogrow")
+                        run_button = ui.button("Tailor resume", icon="auto_awesome").props(
+                            "unelevated"
+                        )
+                        progress_label = ui.label("Ready").classes("rb-subtle")
+                        progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
+                    else:
+                        ui.label("Start here").classes("rb-section-title")
                         ui.label(
-                            "Upload a master resume, paste a job description, and get a focused "
-                            "rewrite that keeps output locked until payment when your free run "
-                            "is used."
-                        ).classes("rb-hero-copy")
-
-                    with ui.row().classes("gap-3"):
-                        if is_signed_in:
-                            ui.button(
-                                "Open dashboard",
-                                icon="arrow_forward",
-                                on_click=lambda: ui.navigate.to("/dashboard"),
-                            ).props("unelevated")
-                        else:
-                            ui.button(
-                                "Create free account",
-                                icon="person_add",
-                                on_click=lambda: ui.navigate.to("/register"),
-                            ).props("unelevated")
-                            ui.button(
-                                "Sign in",
-                                icon="login",
-                                on_click=lambda: ui.navigate.to("/login"),
-                            ).props("outline")
-
-                    with ui.row().classes("rb-proof"):
-                        with ui.column().classes("rb-soft gap-1"):
-                            ui.label("Free first run").classes("font-medium")
-                            ui.label("One resume, one visible tailored output.").classes(
-                                "rb-subtle"
-                            )
-                        with ui.column().classes("rb-soft gap-1"):
-                            ui.label("Fact checked").classes("font-medium")
-                            ui.label("The graph validates against source text.").classes(
-                                "rb-subtle"
-                            )
-                        with ui.column().classes("rb-soft gap-1"):
-                            ui.label("Export ready").classes("font-medium")
-                            ui.label("Download TXT, DOCX, or PDF after unlock.").classes(
-                                "rb-subtle"
-                            )
-
-                with ui.column().classes("rb-panel gap-5"):
-                    ui.label("Start here").classes("text-xl font-medium")
-                    if is_signed_in:
-                        ui.label("You are signed in. Continue to the workspace.").classes(
-                            "rb-subtle"
-                        )
-                        ui.button(
-                            "Open dashboard",
-                            icon="dashboard",
-                            on_click=lambda: ui.navigate.to("/dashboard"),
-                        ).props("unelevated").classes("w-full")
-                    else:
-                        landing_error = ui.label("").classes("rb-danger text-sm")
+                            "Create an account or sign in, then this same page becomes the "
+                            "resume workspace."
+                        ).classes("rb-subtle")
                         mode = ui.toggle(["Create", "Sign in"], value="Create").props(
                             "unelevated"
                         )
@@ -337,8 +283,9 @@ def index_page() -> None:
                         password = ui.input(
                             "Password", password=True
                         ).props("outlined dense").classes("w-full")
+                        auth_error = ui.label("").classes("rb-danger text-sm")
 
-                        async def submit_landing_auth() -> None:
+                        async def submit_auth() -> None:
                             endpoint = (
                                 "/api/v1/auth/register"
                                 if mode.value == "Create"
@@ -346,7 +293,9 @@ def index_page() -> None:
                             )
                             result = await _auth_request(endpoint, email.value, password.value)
                             if result.get("ok"):
-                                ui.navigate.to("/dashboard")
+                                await ui.run_javascript(
+                                    "window.location.href = '/app/';", timeout=5.0
+                                )
                                 return
                             fallback = (
                                 "Could not create account"
@@ -354,118 +303,27 @@ def index_page() -> None:
                                 else "Login failed"
                             )
                             detail = result.get("payload", {}).get("detail", fallback)
-                            landing_error.set_text(str(detail))
+                            auth_error.set_text(str(detail))
 
                         ui.button(
                             "Continue",
                             icon="arrow_forward",
-                            on_click=submit_landing_auth,
+                            on_click=submit_auth,
                         ).props("unelevated").classes("w-full")
+                        ui.separator()
+                        ui.label("Workspace preview").classes("font-medium")
+                        ui.label("Upload, tailoring, paywall, and exports all live here.").classes(
+                            "rb-subtle"
+                        )
 
-                    ui.separator()
-                    with ui.column().classes("gap-3"):
-                        for number, title, body in (
-                            ("1", "Upload", "Add a PDF, DOCX, or TXT master resume."),
-                            ("2", "Tailor", "Paste the job description and stream progress live."),
-                            ("3", "Unlock", "Pay only when output is locked after the free run."),
-                        ):
-                            with ui.row().classes("rb-step"):
-                                ui.label(number).classes("rb-step-number")
-                                with ui.column().classes("gap-0"):
-                                    ui.label(title).classes("font-medium")
-                                    ui.label(body).classes("rb-subtle")
-
-
-@ui.page("/login")
-def login_page() -> None:
-    _install_page_shell()
-    email, password, error, button_row = _auth_layout(
-        "Sign in",
-        "Tailor a resume to a job description with one focused workflow.",
-    )
-
-    async def do_login() -> None:
-        result = await _auth_request("/api/v1/auth/login", email.value, password.value)
-        if result.get("ok"):
-            ui.navigate.to("/dashboard")
-            return
-        detail = result.get("payload", {}).get("detail", "Login failed")
-        error.set_text(str(detail))
-
-    with button_row:
-        ui.link("Create account", "/register").classes("rb-subtle")
-        ui.button("Sign in", icon="login", on_click=do_login).props("unelevated")
-
-
-@ui.page("/register")
-def register_page() -> None:
-    _install_page_shell()
-    email, password, error, button_row = _auth_layout(
-        "Create account",
-        "Your first resume and tailored run are visible before payment.",
-    )
-
-    async def do_register() -> None:
-        result = await _auth_request("/api/v1/auth/register", email.value, password.value)
-        if result.get("ok"):
-            ui.navigate.to("/dashboard")
-            return
-        detail = result.get("payload", {}).get("detail", "Registration failed")
-        error.set_text(str(detail))
-
-    with button_row:
-        ui.link("I already have an account", "/login").classes("rb-subtle")
-        ui.button("Create", icon="person_add", on_click=do_register).props("unelevated")
-
-
-@ui.page("/dashboard")
-@require_auth
-def dashboard_page() -> None:
-    _install_page_shell()
-    request = _request()
-    query = request.query_params if request is not None else {}
-
-    state: dict[str, Any] = {
-        "run_id": query.get("run_id"),
-        "payment_id": None,
-        "poll_payment": query.get("paid") == "1" and bool(query.get("run_id")),
-    }
-
-    with ui.column().classes("rb-page"):
-        with ui.column().classes("rb-shell gap-5"):
-            with ui.row().classes("items-center justify-between w-full"):
-                with ui.column().classes("gap-1"):
-                    ui.label("Resume Builder").classes("rb-title")
-                    ui.label("Upload once, tailor precisely, unlock only when needed.").classes(
-                        "rb-subtle"
-                    )
-
-                async def do_logout() -> None:
-                    await ui.run_javascript("await window.rbFingerprint.logout();", timeout=10.0)
-
-                ui.button("Sign out", icon="logout", on_click=do_logout).props("flat")
-
-            with ui.row().classes("w-full gap-5").style("align-items: stretch;"):
-                with ui.column().classes("rb-panel gap-4").style("flex: 0 0 360px;"):
-                    ui.label("Inputs").classes("text-lg font-medium")
-                    status_label = ui.label("Loading account...").classes("rb-subtle")
-                    resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
-                    upload_status = ui.label("").classes("text-sm")
-                    upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
-                        "w-full"
-                    )
-                    jd_input = ui.textarea("Job description").props("outlined").classes("w-full")
-                    jd_input.props("autogrow")
-                    run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
-                    progress_label = ui.label("Ready").classes("rb-subtle")
-                    progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
-
-                with ui.column().classes("gap-4").style("flex: 1 1 520px; min-width: 0;"):
+                with ui.column().classes("gap-4").style("min-width: 0;"):
                     with ui.row().classes("items-center justify-between w-full"):
-                        ui.label("Output").classes("text-lg font-medium")
+                        ui.label("Output").classes("rb-section-title")
                         export_row = ui.row().classes("gap-2 hidden")
                     output = ui.markdown(
-                        "Upload a resume, paste a job description, then start a tailored run."
+                        "Sign in on this page to upload a resume and start a tailored run."
+                        if not is_signed_in
+                        else "Upload a resume, paste a job description, then start a tailored run."
                     ).classes("rb-panel rb-output w-full")
                     payment_status = ui.label("").classes("rb-subtle")
 
@@ -480,6 +338,10 @@ def dashboard_page() -> None:
             crypto_button = ui.button("Crypto", icon="currency_bitcoin").props("outline")
         crypto_status = ui.label("").classes("rb-subtle")
 
+    if not is_signed_in:
+        ui.timer(0.1, lambda: ui.run_javascript("window.rbFingerprint.get();"), once=True)
+        return
+
     async def load_account() -> None:
         async with api_client() as client:
             user_resp = await client.get("/api/v1/auth/me")
@@ -487,7 +349,8 @@ def dashboard_page() -> None:
             resumes_resp = await client.get("/api/v1/resumes")
 
         if user_resp.status_code != 200:
-            ui.navigate.to("/login")
+            status_label.set_text("Session expired. Sign in again on this page.")
+            output.set_content("Refresh this page to sign in again.")
             return
 
         user = user_resp.json()
@@ -620,9 +483,7 @@ def dashboard_page() -> None:
             amount = data.get("pay_amount")
             currency = data.get("pay_currency")
             address = data.get("pay_address")
-            crypto_status.set_text(
-                f"Send {amount} {currency} to {address}"
-            )
+            crypto_status.set_text(f"Send {amount} {currency} to {address}")
             return
         crypto_status.set_text(_format_detail(response.text, "Crypto invoice failed"))
 

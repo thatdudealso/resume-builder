@@ -27,8 +27,8 @@ def create_checkout_session(*, user_id: str, run_id: str, email: str) -> str:
             }
         ],
         metadata={"user_id": user_id, "run_id": run_id},
-        success_url=f"{settings.cors_origin_list[0]}/app/dashboard?paid=1&run_id={run_id}",
-        cancel_url=f"{settings.cors_origin_list[0]}/app/dashboard?cancelled=1",
+        success_url=f"{settings.cors_origin_list[0]}/app/?paid=1&run_id={run_id}",
+        cancel_url=f"{settings.cors_origin_list[0]}/app/?cancelled=1",
     )
     return session.url or ""
 

@@ -13,8 +13,8 @@ Dev-only file. **Never merge to `main`.**
 ## Key paths
 
 - `apps/web/main.py` — FastAPI + NiceGUI entry
-- `apps/web/ui/app.py` — NiceGUI pages and frontend workflow
-- `apps/web/ui/auth_guard.py` — UI auth guard and backend API client
+- `apps/web/ui/app.py` — single NiceGUI home page and frontend workflow
+- `apps/web/ui/auth_guard.py` — backend API client for UI server calls
 - `apps/web/api/v1/` — backend API contracts consumed by the UI
 - `packages/agent/graph.py` — LangGraph workflow
 - `packages/core/access/service.py` — paywall logic
@@ -24,6 +24,9 @@ Dev-only file. **Never merge to `main`.**
 ## Frontend rules
 
 - Keep the product screen simple and task-oriented; do not add a marketing landing page.
+- The NiceGUI frontend has one user-facing page at `/app/`. Do not add
+  `/login`, `/register`, `/dashboard`, or other product pages; auth, upload,
+  tailoring, paywall, payment return polling, and exports all live on the home page.
 - Browser auth must call `/api/v1/auth/register` and `/api/v1/auth/login` with
   `credentials: 'include'` so httpOnly cookies are stored.
 - Set and reuse a stable `rb_device_fingerprint` cookie, then send it as

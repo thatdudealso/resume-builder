@@ -16,6 +16,10 @@ Use it before changing code, opening PRs, or updating generated documentation.
 ## Frontend Rules
 
 - Keep the NiceGUI app minimal, focused, and operational; do not build a marketing page.
+- Build one user-facing NiceGUI page at `/app/`. Do not add `/login`,
+  `/register`, `/dashboard`, or other product pages.
+- Keep auth, upload, job-description input, streaming status, locked preview,
+  paywall actions, payment return polling, and exports on that home page.
 - Use the backend API contracts in `apps/web/api/v1/**` instead of duplicating business logic.
 - Login and registration must happen in the browser with `credentials: 'include'` so httpOnly cookies are stored correctly.
 - Send `X-Device-Fingerprint` on auth, upload, run, billing, and export calls.

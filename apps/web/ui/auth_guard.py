@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from functools import wraps
-from typing import Any
 
 import httpx
-from nicegui import ui
 from nicegui.storage import request_contextvar
 
 
@@ -41,18 +38,3 @@ async def api_client() -> AsyncIterator[httpx.AsyncClient]:
         follow_redirects=True,
     ) as client:
         yield client
-
-
-def require_auth(page_func: Callable[..., Any]) -> Callable[..., Any]:
-    @wraps(page_func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        request = request_contextvar.get()
-        if request is None:
-            ui.navigate.to("/login")
-            return None
-        if not request.cookies.get("access_token"):
-            ui.navigate.to("/login")
-            return None
-        return page_func(*args, **kwargs)
-
-    return wrapper
