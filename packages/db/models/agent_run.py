@@ -26,7 +26,8 @@ class AgentRun(Base):
     is_free_trial_run: Mapped[bool] = mapped_column(Boolean, default=False)
     output_locked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     payment_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("payments.id")
+        UUID(as_uuid=True),
+        ForeignKey("payments.id", use_alter=True, name="fk_agent_runs_payment_id"),
     )
     ats_score_before: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     ats_score_after: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
