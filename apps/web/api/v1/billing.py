@@ -9,13 +9,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.web.config import settings
 from apps.web.dependencies import get_current_user, get_db
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.payment import Payment
 from packages.db.models.user import User
 from packages.integrations.crypto.nowpayments import create_invoice
 from packages.integrations.stripe_client import create_checkout_session
-from apps.web.config import settings
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -30,7 +30,10 @@ class CryptoInvoiceRequest(BaseModel):
 
 
 @router.get("/status")
-async def billing_status(user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+async def billing_status(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
     payments = await session.execute(
         select(Payment).where(Payment.user_id == user.id).order_by(Payment.created_at.desc())
     )
@@ -41,7 +44,11 @@ async def billing_status(user: User = Depends(get_current_user), session: AsyncS
     return {
         "free_trial_used": user.free_trial_used,
         "pending_payments": [
-            {"payment_id": str(p.id), "status": p.status, "run_id": str(p.run_id) if p.run_id else None}
+            {
+                "payment_id": str(p.id),
+                "status": p.status,
+                "run_id": str(p.run_id) if p.run_id else None,
+            }
             for p in rows
             if p.status == "pending"
         ],

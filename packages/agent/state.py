@@ -8,7 +8,7 @@ class AgentState(TypedDict, total=False):
     run_id: str
     user_id: str
     master_resume_text: str
-    master_resume_structured: dict
+    master_resume_structured: dict[str, str]
     jd_text: str
     jd_keywords: list[str]
     keyword_gaps: list[str]
@@ -18,7 +18,8 @@ class AgentState(TypedDict, total=False):
     validation_errors: list[str]
     validation_passed: bool
     retry_count: int
-    final_output: dict
+    final_output: dict[str, object]  # built by format_output; values are str/float/list/dict
+    preview_text: str
     output_locked: bool
     cancelled: bool
     fatal_error: str
@@ -54,7 +55,9 @@ def split_sections(text: str) -> dict[str, str]:
 
 def extract_keywords(jd_text: str) -> list[str]:
     words = re.findall(r"[A-Za-z][A-Za-z0-9+#./-]{1,}", jd_text.lower())
-    stop = {"and", "the", "with", "for", "you", "will", "our", "are", "this", "that", "from", "have"}
+    stop = {
+        "and", "the", "with", "for", "you", "will", "our", "are", "this", "that", "from", "have"
+    }
     freq: dict[str, int] = {}
     for w in words:
         if len(w) < 3 or w in stop:

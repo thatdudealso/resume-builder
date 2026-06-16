@@ -46,7 +46,11 @@ def register_page() -> None:
         if resp.status_code == 200:
             ui.navigate.to("/app/dashboard")
         else:
-            detail = resp.json().get("detail", "Registration failed") if resp.content else "Registration failed"
+            detail = (
+                resp.json().get("detail", "Registration failed")
+                if resp.content
+                else "Registration failed"
+            )
             error.set_text(str(detail))
 
     ui.button("Register", on_click=do_register)
@@ -93,7 +97,8 @@ def dashboard_page() -> None:
             if resp.status_code == 200:
                 data = resp.json()
                 upload_status.set_text(
-                    f"Send {data.get('pay_amount')} {data.get('pay_currency')} to {data.get('pay_address')}"
+                    f"Send {data.get('pay_amount')} {data.get('pay_currency')}"
+                    f" to {data.get('pay_address')}"
                 )
             else:
                 upload_status.set_text(f"Crypto error: {resp.text}")

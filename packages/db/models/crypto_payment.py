@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import ForeignKey, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from packages.db.base import Base, JsonType, new_uuid
@@ -25,4 +24,4 @@ class CryptoPayment(Base):
     confirmations: Mapped[int] = mapped_column(Integer, default=0)
     webhook_payload: Mapped[dict | None] = mapped_column(JsonType)
 
-    payment: Mapped["Payment"] = relationship(back_populates="crypto_detail")
+    payment: Mapped[Payment] = relationship(back_populates="crypto_detail")

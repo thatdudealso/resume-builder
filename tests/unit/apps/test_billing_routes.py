@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from decimal import Decimal
-from uuid import uuid4
-
 import pytest
 
 from apps.web.api.v1.billing import StripeCheckoutRequest, stripe_checkout
@@ -19,7 +16,9 @@ async def test_stripe_checkout_route(session, monkeypatch):
     resume = MasterResume(user_id=user.id, filename="r.pdf", s3_key="k", raw_text="x " * 30)
     session.add(resume)
     await session.flush()
-    run = AgentRun(user_id=user.id, master_resume_id=resume.id, jd_text="jd " * 10, output_locked=True)
+    run = AgentRun(
+        user_id=user.id, master_resume_id=resume.id, jd_text="jd " * 10, output_locked=True
+    )
     session.add(run)
     await session.commit()
 
@@ -33,7 +32,11 @@ async def test_stripe_checkout_route(session, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_stripe_webhook_idempotent(session, monkeypatch):
-    event = {"id": "evt_2", "type": "checkout.session.completed", "data": {"object": {"id": "cs", "metadata": {}}}}
+    event = {
+        "id": "evt_2",
+        "type": "checkout.session.completed",
+        "data": {"object": {"id": "cs", "metadata": {}}},
+    }
     monkeypatch.setattr("apps.web.api.v1.webhooks.stripe.construct_event", lambda p, s: event)
     from starlette.requests import Request
 

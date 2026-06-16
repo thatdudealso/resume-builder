@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 import httpx
-from nicegui import app as nicegui_app, ui
+from nicegui import app as nicegui_app
+from nicegui import ui
 
 
 def _base_url() -> str:

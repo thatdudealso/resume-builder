@@ -46,7 +46,6 @@ class AccessService:
             return True
         from sqlalchemy import func
 
-        from packages.db.models.resume import MasterResume
 
         result = await self.session.execute(
             select(func.count())

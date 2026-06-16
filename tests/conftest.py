@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -16,8 +17,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("NOWPAYMENTS_API_KEY", "test")
 
-from packages.db.base import Base
 import packages.db.models  # noqa: F401
+from packages.db.base import Base
 
 
 @pytest.fixture(scope="session")
@@ -29,14 +30,28 @@ def event_loop():
 
 @pytest_asyncio.fixture
 async def engine():
-    engine = create_async_engine(
-        os.environ["DATABASE_URL"],
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    db_url = os.environ["DATABASE_URL"]
+    is_sqlite = db_url.startswith("sqlite")
+    kwargs: dict[str, object] = {"echo": False}
+    if is_sqlite:
+        kwargs["connect_args"] = {"check_same_thread": False}
+        kwargs["poolclass"] = StaticPool
+    engine = create_async_engine(db_url, **kwargs)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        if is_sqlite:
+            # SQLite in-memory: create schema fresh each test.
+            await conn.run_sync(Base.metadata.create_all)
+        else:
+            # PostgreSQL in CI: schema already created by the migrate service
+            # (Alembic). Truncate all tables to get a clean slate without
+            # touching constraint definitions (avoids CircularDependencyError
+            # and named-constraint mismatches from use_alter).
+            table_names = ", ".join(
+                f'"{t.name}"' for t in Base.metadata.sorted_tables
+            )
+            await conn.execute(
+                text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
+            )
     yield engine
     await engine.dispose()
 
@@ -51,9 +66,9 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(engine, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
+    import packages.db.session as db_session
     from apps.web import dependencies as deps
     from apps.web.main import create_app
-    import packages.db.session as db_session
 
     app = create_app()
 

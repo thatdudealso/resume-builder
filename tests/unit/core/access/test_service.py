@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from packages.core.access.service import AccessService
@@ -8,7 +10,6 @@ from packages.core.security.jwt import register_user
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.payment import Payment
 from packages.db.models.resume import MasterResume
-from decimal import Decimal
 
 
 @pytest.mark.asyncio

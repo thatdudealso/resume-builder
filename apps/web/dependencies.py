@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 from uuid import UUID
 
 import redis.asyncio as redis
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from packages.core.security.jwt import ACCESS_COOKIE, REFRESH_COOKIE, decode_access_token
+from packages.core.security.jwt import ACCESS_COOKIE, decode_access_token
 from packages.db.models.user import User
 from packages.db.session import get_session
 

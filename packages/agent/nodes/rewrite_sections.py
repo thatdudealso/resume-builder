@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from packages.agent.state import AgentState, score_coverage
 
 

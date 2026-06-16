@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.web.config import settings
+from packages.agent.checkpointer import get_checkpointer
 from packages.agent.graph import run_agent
 from packages.core.access.service import AccessService
 from packages.core.schemas.access import RunAccessMode
@@ -63,7 +63,8 @@ async def execute_run(session: AsyncSession, run_id: UUID) -> None:
         return result
 
     try:
-        result = await run_agent(initial, llm_complete)
+        async with get_checkpointer(settings.database_url) as checkpointer:
+            result = await run_agent(initial, llm_complete, checkpointer=checkpointer)
         run.final_output = result.get("final_output")
         run.preview_text = (result.get("preview_text") or "")[:500]
         run.ats_score_before = Decimal(str(result.get("ats_score_before", 0)))

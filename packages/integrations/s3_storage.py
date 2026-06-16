@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import io
-import uuid
-
 import boto3
 from botocore.client import Config
 

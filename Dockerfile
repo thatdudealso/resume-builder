@@ -11,7 +11,8 @@ COPY pyproject.toml README.md ./
 COPY apps apps
 COPY packages packages
 COPY migrations migrations
-COPY alembic.ini scripts ./
+COPY alembic.ini ./
+COPY scripts scripts
 
 RUN pip install --no-cache-dir -e ".[dev]"
 

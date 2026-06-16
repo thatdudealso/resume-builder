@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import asyncio
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
 from packages.agent.nodes.format_output import format_output
@@ -28,7 +28,10 @@ def _after_validate(state: AgentState) -> str:
     return END
 
 
-def build_graph(llm_complete: LLMComplete):
+def build_graph(
+    llm_complete: LLMComplete,
+    checkpointer: BaseCheckpointSaver | None = None,
+):
     graph = StateGraph(AgentState)
 
     async def prep_node(state: AgentState) -> AgentState:
@@ -48,7 +51,11 @@ def build_graph(llm_complete: LLMComplete):
     graph.add_node("validate_output", validate_node)
     graph.add_node("format_output", format_node)
     graph.set_entry_point("prepare_inputs")
-    graph.add_conditional_edges("prepare_inputs", _after_prepare, {"rewrite_sections": "rewrite_sections", END: END})
+    graph.add_conditional_edges(
+        "prepare_inputs",
+        _after_prepare,
+        {"rewrite_sections": "rewrite_sections", END: END},
+    )
     graph.add_edge("rewrite_sections", "validate_output")
     graph.add_conditional_edges(
         "validate_output",
@@ -56,10 +63,21 @@ def build_graph(llm_complete: LLMComplete):
         {"format_output": "format_output", "rewrite_sections": "rewrite_sections", END: END},
     )
     graph.add_edge("format_output", END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 
-async def run_agent(initial: AgentState, llm_complete: LLMComplete) -> AgentState:
-    app = build_graph(llm_complete)
-    result = await app.ainvoke(initial)
+async def run_agent(
+    initial: AgentState,
+    llm_complete: LLMComplete,
+    checkpointer: BaseCheckpointSaver | None = None,
+) -> AgentState:
+    """Run the resume tailoring graph.
+
+    When a checkpointer is provided, the run is keyed by ``initial["run_id"]``
+    so the graph can resume from the last saved checkpoint if the container
+    restarts mid-run.
+    """
+    app = build_graph(llm_complete, checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": initial["run_id"]}} if checkpointer else {}
+    result = await app.ainvoke(initial, config)
     return result

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,9 +49,14 @@ async def upload_resume(
 
 
 @router.get("")
-async def list_resumes(user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+async def list_resumes(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
     result = await session.execute(
-        select(MasterResume).where(MasterResume.user_id == user.id).order_by(MasterResume.created_at.desc())
+        select(MasterResume)
+        .where(MasterResume.user_id == user.id)
+        .order_by(MasterResume.created_at.desc())
     )
     rows = result.scalars().all()
     return {

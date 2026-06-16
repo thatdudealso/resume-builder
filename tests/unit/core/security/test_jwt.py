@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from packages.core.security.jwt import create_access_token, decode_access_token, hash_password, verify_password
+from packages.core.security.jwt import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 from packages.core.security.sanitization import sanitize_text
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
 
 import httpx
 
@@ -61,7 +60,9 @@ async def _claude_fallback(prompt: str, node: str) -> str:
     import anthropic
 
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    model = "claude-3-5-haiku-20241022" if node == "validate_output" else "claude-3-5-sonnet-20241022"
+    model = (
+        "claude-3-5-haiku-20241022" if node == "validate_output" else "claude-3-5-sonnet-20241022"
+    )
     msg = await client.messages.create(
         model=model,
         max_tokens=1024,
@@ -77,5 +78,8 @@ async def _mock_response(prompt: str, node: str) -> str:
     if node == "validate_output":
         return "no"
     if "JSON" in prompt:
-        return '{"summary": "Experienced professional.", "experience": "Led projects.", "skills": "Python, SQL"}'
+        return (
+            '{"summary": "Experienced professional.", "experience": "Led projects.",'
+            ' "skills": "Python, SQL"}'
+        )
     return "Experienced professional with relevant skills."

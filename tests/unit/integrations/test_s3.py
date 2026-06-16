@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from packages.integrations.s3_storage import presigned_url, upload_bytes
 
 

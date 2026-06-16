@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from packages.agent.nodes.validate_output import _rule_validate
 
 

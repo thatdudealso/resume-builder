@@ -24,4 +24,4 @@ class Export(Base):
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    run: Mapped["AgentRun"] = relationship(back_populates="exports")
+    run: Mapped[AgentRun] = relationship(back_populates="exports")
