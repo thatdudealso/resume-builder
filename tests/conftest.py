@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -37,11 +38,20 @@ async def engine():
         kwargs["poolclass"] = StaticPool
     engine = create_async_engine(db_url, **kwargs)
     async with engine.begin() as conn:
-        # For Postgres in CI, previous tests may have committed data.
-        # Drop all tables first to guarantee a clean schema per test.
-        if not is_sqlite:
-            await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        if is_sqlite:
+            # SQLite in-memory: create schema fresh each test.
+            await conn.run_sync(Base.metadata.create_all)
+        else:
+            # PostgreSQL in CI: schema already created by the migrate service
+            # (Alembic). Truncate all tables to get a clean slate without
+            # touching constraint definitions (avoids CircularDependencyError
+            # and named-constraint mismatches from use_alter).
+            table_names = ", ".join(
+                f'"{t.name}"' for t in Base.metadata.sorted_tables
+            )
+            await conn.execute(
+                text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
+            )
     yield engine
     await engine.dispose()
 
