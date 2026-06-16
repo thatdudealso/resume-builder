@@ -207,12 +207,8 @@ def index_page() -> None:
                     ui.label("PDF, DOCX, or TXT master resume.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("2. Tailor").classes("font-medium")
-                    ui.label("Live SSE progress from the agent graph.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("3. Unlock").classes("font-medium")
-                    ui.label("Pay only when output is locked after the free run.").classes(
-                        "rb-subtle"
-                    )
 
             with ui.element("section").classes("rb-grid w-full"):
                 with ui.column().classes("rb-panel gap-4"):
