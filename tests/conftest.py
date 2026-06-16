@@ -37,6 +37,10 @@ async def engine():
         kwargs["poolclass"] = StaticPool
     engine = create_async_engine(db_url, **kwargs)
     async with engine.begin() as conn:
+        # For Postgres in CI, previous tests may have committed data.
+        # Drop all tables first to guarantee a clean schema per test.
+        if not is_sqlite:
+            await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
