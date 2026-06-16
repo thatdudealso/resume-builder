@@ -8,7 +8,7 @@ class AgentState(TypedDict, total=False):
     run_id: str
     user_id: str
     master_resume_text: str
-    master_resume_structured: dict
+    master_resume_structured: dict[str, str]
     jd_text: str
     jd_keywords: list[str]
     keyword_gaps: list[str]
@@ -18,7 +18,8 @@ class AgentState(TypedDict, total=False):
     validation_errors: list[str]
     validation_passed: bool
     retry_count: int
-    final_output: dict
+    final_output: dict[str, object]  # built by format_output; values are str/float/list/dict
+    preview_text: str
     output_locked: bool
     cancelled: bool
     fatal_error: str

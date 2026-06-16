@@ -6,7 +6,7 @@ from packages.agent.state import AgentState
 def format_output(state: AgentState) -> AgentState:
     drafts = state.get("section_drafts", {})
     plain = "\n\n".join(f"{k.upper()}\n{v}" for k, v in drafts.items() if v)
-    final = {
+    final: dict[str, object] = {
         "sections": drafts,
         "plain_text": plain,
         "ats_score_before": state.get("ats_score_before"),
