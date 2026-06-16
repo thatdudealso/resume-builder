@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import re
 
+from packages.agent.providers.base import AgentTask
+from packages.agent.schemas.variants import DEFAULT_VARIANT
+from packages.agent.service import AgentService
 from packages.agent.state import AgentState
 
 
@@ -16,9 +19,12 @@ def _rule_validate(source: str, draft: str) -> list[str]:
     return errors
 
 
-async def validate_output(state: AgentState, llm_complete) -> AgentState:
+async def validate_output(state: AgentState, agent_service: AgentService) -> AgentState:
     source = state.get("master_resume_text", "")
-    draft = "\n".join(state.get("section_drafts", {}).values())
+    selected = state.get("selected_variant") or DEFAULT_VARIANT.value
+    variants = state.get("variants") or {}
+    drafts = variants.get(selected) or state.get("section_drafts", {})
+    draft = "\n".join(drafts.values())
     errors = _rule_validate(source, draft)
     if not errors:
         prompt = (
@@ -27,11 +33,7 @@ async def validate_output(state: AgentState, llm_complete) -> AgentState:
             " Answer ONLY yes or no.\n"
             f"Source:\n{source[:4000]}\nDraft:\n{draft[:4000]}"
         )
-        answer = await llm_complete(
-            model="meta-llama/Llama-3.1-8B-Instruct",
-            prompt=prompt,
-            node="validate_output",
-        )
+        answer = await agent_service.complete(AgentTask.VALIDATION, prompt)
         if answer.strip().lower().startswith("y"):
             errors.append("LLM detected unsupported claims")
     passed = len(errors) == 0
@@ -40,6 +42,7 @@ async def validate_output(state: AgentState, llm_complete) -> AgentState:
         retry += 1
     return {
         **state,
+        "section_drafts": drafts,
         "validation_errors": errors,
         "validation_passed": passed,
         "retry_count": retry,
