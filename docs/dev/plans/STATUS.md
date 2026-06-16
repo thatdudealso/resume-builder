@@ -1,6 +1,6 @@
 # Resume Builder — Implementation Status
 
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-16
 **Integration branch:** `develop`
 **Production branch:** `main` (promoted from `qa` only)
 
@@ -12,7 +12,7 @@
 | Auth + AccessService paywall | Done |
 | LangGraph 4-node agent | Done |
 | LangGraph Postgres checkpointer | **PR open** → `feature/langgraph-postgres-checkpointer` |
-| NiceGUI dashboard | MVP done (polish pending) |
+| NiceGUI dashboard | Built on `feature/nicegui-paywall-polish`; PR pending |
 | Stripe + crypto payments | Done (webhooks + billing API) |
 | Exports TXT/DOCX/PDF | Done |
 | Test coverage gate | **85.94%** (94 tests) |
@@ -28,7 +28,7 @@
 | auth-access | JWT, migrations, AccessService | **Done** | |
 | langgraph-agent | 4-node graph, HF, SSE | **Done** | |
 | langgraph-checkpointer | AsyncPostgresSaver wired into graph + run_executor | **PR #2 open** | `feature/langgraph-postgres-checkpointer` → develop |
-| nicegui-ui | Upload, JD, stream, paywall, export | **Partial** | polish → `feature/nicegui-paywall-polish` |
+| nicegui-ui | Landing, browser auth, upload, SSE, paywall, post-payment polling, export gating | **Built** | `feature/nicegui-paywall-polish`; PR pending |
 | payments | Stripe + NOWPayments | **Done** | |
 | exports-infra | Exports, S3, rate limit, headers | **Done** | |
 | testing-ci | 85% gate, GHA workflows | **Partial** | Docker verify → `feature/docker-ci-verify` |
@@ -44,7 +44,7 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | Branch | Scope | Status |
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | `AsyncPostgresSaver` wired into `build_graph` / `run_agent` / `execute_run`; `get_checkpointer()` util; 6 new tests | **PR #2 open** |
-| `feature/nicegui-paywall-polish` | Browser cookie auth, SSE UX, post-payment polling, device fingerprint JS | Not started |
+| `feature/nicegui-paywall-polish` | Functional landing page, browser cookie auth, SSE UX, post-payment polling, device fingerprint JS | Built; browser smoke passed |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql` export, ER diagram, `verify_docs` CI check | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |

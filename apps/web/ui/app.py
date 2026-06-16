@@ -1,207 +1,715 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from nicegui import ui
+from nicegui.storage import request_contextvar
 
 from apps.web.ui.auth_guard import api_client, require_auth
+
+STEPS = {
+    "prepare_inputs": "Reading resume",
+    "rewrite_sections": "Tailoring content",
+    "validate_output": "Checking facts",
+    "format_output": "Formatting result",
+}
+
+
+def _request() -> Any:
+    return request_contextvar.get()
+
+
+def _format_detail(response_text: str, fallback: str) -> str:
+    try:
+        data = json.loads(response_text)
+    except json.JSONDecodeError:
+        return fallback
+    return str(data.get("detail") or data.get("message") or fallback)
+
+
+def _install_page_shell() -> None:
+    ui.add_head_html(
+        """
+        <style>
+          :root {
+            --rb-ink: #17201b;
+            --rb-muted: #66736d;
+            --rb-line: #dce3df;
+            --rb-panel: #fbfcfb;
+            --rb-accent: #2f6f5f;
+            --rb-soft: #eef5f1;
+          }
+          body {
+            background: #f7f8f6;
+            color: var(--rb-ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+              BlinkMacSystemFont, "Segoe UI", sans-serif;
+          }
+          .rb-page {
+            min-height: 100vh;
+            padding: 32px;
+          }
+          .rb-shell {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+          }
+          .rb-landing {
+            min-height: 100vh;
+            padding: 28px;
+          }
+          .rb-landing-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 420px;
+            gap: 28px;
+            align-items: center;
+            min-height: calc(100vh - 56px);
+          }
+          .rb-auth {
+            width: min(420px, calc(100vw - 32px));
+            margin: 12vh auto 0;
+          }
+          .rb-title {
+            font-size: 28px;
+            line-height: 1.15;
+            font-weight: 650;
+            letter-spacing: 0;
+          }
+          .rb-subtle {
+            color: var(--rb-muted);
+            font-size: 14px;
+          }
+          .rb-panel {
+            background: var(--rb-panel);
+            border: 1px solid var(--rb-line);
+            border-radius: 8px;
+            padding: 18px;
+          }
+          .rb-soft {
+            background: var(--rb-soft);
+            border: 1px solid #d6e6dd;
+            border-radius: 8px;
+            padding: 12px 14px;
+          }
+          .rb-output {
+            min-height: 360px;
+            max-height: 62vh;
+            overflow: auto;
+            white-space: normal;
+          }
+          .rb-wordmark {
+            font-size: 14px;
+            font-weight: 650;
+            letter-spacing: 0;
+          }
+          .rb-hero-title {
+            font-size: clamp(40px, 6vw, 72px);
+            line-height: 0.95;
+            font-weight: 680;
+            letter-spacing: 0;
+            max-width: 780px;
+          }
+          .rb-hero-copy {
+            color: var(--rb-muted);
+            font-size: 18px;
+            line-height: 1.55;
+            max-width: 620px;
+          }
+          .rb-step {
+            display: grid;
+            grid-template-columns: 40px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+          }
+          .rb-step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            background: var(--rb-soft);
+            color: var(--rb-accent);
+            font-weight: 650;
+          }
+          .rb-proof {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            max-width: 640px;
+          }
+          .rb-locked {
+            filter: blur(3px);
+            user-select: none;
+          }
+          .rb-danger {
+            color: #a33b30;
+          }
+          .rb-success {
+            color: #2f6f5f;
+          }
+          .q-field__control,
+          .q-textarea .q-field__control {
+            border-radius: 8px;
+          }
+          .q-btn.bg-primary {
+            background: var(--rb-accent) !important;
+          }
+          .text-primary {
+            color: var(--rb-accent) !important;
+          }
+          @media (max-width: 820px) {
+            .rb-page {
+              padding: 18px;
+            }
+            .rb-landing {
+              padding: 18px;
+            }
+            .rb-landing-grid {
+              grid-template-columns: 1fr;
+              min-height: auto;
+              align-items: start;
+            }
+            .rb-proof {
+              grid-template-columns: 1fr;
+            }
+          }
+        </style>
+        <script>
+          window.rbFingerprint = {
+            get() {
+              const existing = document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('rb_device_fingerprint='));
+              if (existing) return decodeURIComponent(existing.split('=')[1]);
+              const raw = [
+                navigator.userAgent,
+                navigator.language,
+                screen.width,
+                screen.height,
+                screen.colorDepth,
+                Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'
+              ].join('|');
+              let hash = 0;
+              for (let i = 0; i < raw.length; i += 1) {
+                hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+                hash |= 0;
+              }
+              const value = `web-${Math.abs(hash).toString(16)}`;
+              document.cookie = `rb_device_fingerprint=${encodeURIComponent(value)}; `
+                + 'path=/; max-age=31536000; samesite=lax';
+              return value;
+            },
+            async auth(path, body) {
+              const response = await fetch(path, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Device-Fingerprint': this.get()
+                },
+                body: JSON.stringify(body)
+              });
+              let payload = {};
+              try { payload = await response.json(); } catch (error) {}
+              return { ok: response.ok, status: response.status, payload };
+            },
+            async logout() {
+              await fetch('/api/v1/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'X-Device-Fingerprint': this.get() }
+              });
+              window.location.href = '/app/login';
+            }
+          };
+        </script>
+        """
+    )
+
+
+async def _auth_request(path: str, email: str | None, password: str | None) -> dict[str, Any]:
+    payload = {"email": (email or "").strip(), "password": password or ""}
+    return await ui.run_javascript(
+        f"return await window.rbFingerprint.auth({json.dumps(path)}, {json.dumps(payload)});",
+        timeout=20.0,
+    )
+
+
+def _auth_layout(title: str, subtitle: str) -> tuple[Any, Any, Any, Any]:
+    with ui.column().classes("rb-auth gap-5"):
+        with ui.column().classes("gap-1"):
+            ui.label("Resume Builder").classes("rb-title")
+            ui.label(subtitle).classes("rb-subtle")
+        with ui.column().classes("rb-panel gap-4 w-full"):
+            ui.label(title).classes("text-lg font-medium")
+            email = ui.input("Email").props("outlined dense").classes("w-full")
+            password = ui.input("Password", password=True).props("outlined dense").classes("w-full")
+            error = ui.label("").classes("rb-danger text-sm")
+            button_row = ui.row().classes("items-center justify-between w-full")
+    return email, password, error, button_row
+
+
+@ui.page("/")
+def index_page() -> None:
+    _install_page_shell()
+    request = _request()
+    is_signed_in = bool(request and request.cookies.get("access_token"))
+
+    with ui.column().classes("rb-landing"):
+        with ui.column().classes("rb-shell gap-8"):
+            with ui.row().classes("items-center justify-between w-full"):
+                ui.label("Resume Builder").classes("rb-wordmark")
+                with ui.row().classes("gap-2"):
+                    if is_signed_in:
+                        ui.button("Dashboard", icon="dashboard").props("flat").on_click(
+                            lambda: ui.navigate.to("/dashboard")
+                        )
+                    else:
+                        ui.button("Sign in", icon="login").props("flat").on_click(
+                            lambda: ui.navigate.to("/login")
+                        )
+
+            with ui.element("section").classes("rb-landing-grid"):
+                with ui.column().classes("gap-7"):
+                    with ui.column().classes("gap-4"):
+                        ui.label("Tailor your resume without inventing facts.").classes(
+                            "rb-hero-title"
+                        )
+                        ui.label(
+                            "Upload a master resume, paste a job description, and get a focused "
+                            "rewrite that keeps output locked until payment when your free run "
+                            "is used."
+                        ).classes("rb-hero-copy")
+
+                    with ui.row().classes("gap-3"):
+                        if is_signed_in:
+                            ui.button(
+                                "Open dashboard",
+                                icon="arrow_forward",
+                                on_click=lambda: ui.navigate.to("/dashboard"),
+                            ).props("unelevated")
+                        else:
+                            ui.button(
+                                "Create free account",
+                                icon="person_add",
+                                on_click=lambda: ui.navigate.to("/register"),
+                            ).props("unelevated")
+                            ui.button(
+                                "Sign in",
+                                icon="login",
+                                on_click=lambda: ui.navigate.to("/login"),
+                            ).props("outline")
+
+                    with ui.row().classes("rb-proof"):
+                        with ui.column().classes("rb-soft gap-1"):
+                            ui.label("Free first run").classes("font-medium")
+                            ui.label("One resume, one visible tailored output.").classes(
+                                "rb-subtle"
+                            )
+                        with ui.column().classes("rb-soft gap-1"):
+                            ui.label("Fact checked").classes("font-medium")
+                            ui.label("The graph validates against source text.").classes(
+                                "rb-subtle"
+                            )
+                        with ui.column().classes("rb-soft gap-1"):
+                            ui.label("Export ready").classes("font-medium")
+                            ui.label("Download TXT, DOCX, or PDF after unlock.").classes(
+                                "rb-subtle"
+                            )
+
+                with ui.column().classes("rb-panel gap-5"):
+                    ui.label("Start here").classes("text-xl font-medium")
+                    if is_signed_in:
+                        ui.label("You are signed in. Continue to the workspace.").classes(
+                            "rb-subtle"
+                        )
+                        ui.button(
+                            "Open dashboard",
+                            icon="dashboard",
+                            on_click=lambda: ui.navigate.to("/dashboard"),
+                        ).props("unelevated").classes("w-full")
+                    else:
+                        landing_error = ui.label("").classes("rb-danger text-sm")
+                        mode = ui.toggle(["Create", "Sign in"], value="Create").props(
+                            "unelevated"
+                        )
+                        email = ui.input("Email").props("outlined dense").classes("w-full")
+                        password = ui.input(
+                            "Password", password=True
+                        ).props("outlined dense").classes("w-full")
+
+                        async def submit_landing_auth() -> None:
+                            endpoint = (
+                                "/api/v1/auth/register"
+                                if mode.value == "Create"
+                                else "/api/v1/auth/login"
+                            )
+                            result = await _auth_request(endpoint, email.value, password.value)
+                            if result.get("ok"):
+                                ui.navigate.to("/dashboard")
+                                return
+                            fallback = (
+                                "Could not create account"
+                                if mode.value == "Create"
+                                else "Login failed"
+                            )
+                            detail = result.get("payload", {}).get("detail", fallback)
+                            landing_error.set_text(str(detail))
+
+                        ui.button(
+                            "Continue",
+                            icon="arrow_forward",
+                            on_click=submit_landing_auth,
+                        ).props("unelevated").classes("w-full")
+
+                    ui.separator()
+                    with ui.column().classes("gap-3"):
+                        for number, title, body in (
+                            ("1", "Upload", "Add a PDF, DOCX, or TXT master resume."),
+                            ("2", "Tailor", "Paste the job description and stream progress live."),
+                            ("3", "Unlock", "Pay only when output is locked after the free run."),
+                        ):
+                            with ui.row().classes("rb-step"):
+                                ui.label(number).classes("rb-step-number")
+                                with ui.column().classes("gap-0"):
+                                    ui.label(title).classes("font-medium")
+                                    ui.label(body).classes("rb-subtle")
 
 
 @ui.page("/login")
 def login_page() -> None:
-    ui.label("Resume Builder").classes("text-2xl font-bold")
-    email = ui.input("Email").classes("w-full")
-    password = ui.input("Password", password=True).classes("w-full")
-    error = ui.label("").classes("text-red")
+    _install_page_shell()
+    email, password, error, button_row = _auth_layout(
+        "Sign in",
+        "Tailor a resume to a job description with one focused workflow.",
+    )
 
     async def do_login() -> None:
-        async with api_client() as client:
-            resp = await client.post(
-                "/api/v1/auth/login",
-                json={"email": email.value, "password": password.value},
-                headers={"X-Device-Fingerprint": "nicegui-client"},
-            )
-        if resp.status_code == 200:
-            ui.navigate.to("/app/dashboard")
-        else:
-            detail = resp.json().get("detail", "Login failed") if resp.content else "Login failed"
-            error.set_text(str(detail))
+        result = await _auth_request("/api/v1/auth/login", email.value, password.value)
+        if result.get("ok"):
+            ui.navigate.to("/dashboard")
+            return
+        detail = result.get("payload", {}).get("detail", "Login failed")
+        error.set_text(str(detail))
 
-    ui.button("Login", on_click=do_login)
-    ui.link("Register", "/app/register")
+    with button_row:
+        ui.link("Create account", "/register").classes("rb-subtle")
+        ui.button("Sign in", icon="login", on_click=do_login).props("unelevated")
 
 
 @ui.page("/register")
 def register_page() -> None:
-    ui.label("Create account").classes("text-2xl font-bold")
-    email = ui.input("Email").classes("w-full")
-    password = ui.input("Password", password=True).classes("w-full")
-    error = ui.label("").classes("text-red")
+    _install_page_shell()
+    email, password, error, button_row = _auth_layout(
+        "Create account",
+        "Your first resume and tailored run are visible before payment.",
+    )
 
     async def do_register() -> None:
-        async with api_client() as client:
-            resp = await client.post(
-                "/api/v1/auth/register",
-                json={"email": email.value, "password": password.value},
-                headers={"X-Device-Fingerprint": "nicegui-client"},
-            )
-        if resp.status_code == 200:
-            ui.navigate.to("/app/dashboard")
-        else:
-            detail = (
-                resp.json().get("detail", "Registration failed")
-                if resp.content
-                else "Registration failed"
-            )
-            error.set_text(str(detail))
+        result = await _auth_request("/api/v1/auth/register", email.value, password.value)
+        if result.get("ok"):
+            ui.navigate.to("/dashboard")
+            return
+        detail = result.get("payload", {}).get("detail", "Registration failed")
+        error.set_text(str(detail))
 
-    ui.button("Register", on_click=do_register)
+    with button_row:
+        ui.link("I already have an account", "/login").classes("rb-subtle")
+        ui.button("Create", icon="person_add", on_click=do_register).props("unelevated")
 
 
 @ui.page("/dashboard")
 @require_auth
 def dashboard_page() -> None:
-    ui.label("Dashboard").classes("text-2xl font-bold")
-    status_label = ui.label("")
-    upload_status = ui.label("")
-    jd_input = ui.textarea("Job Description").classes("w-full")
-    output = ui.markdown("").classes("w-full")
-    paywall = ui.column().classes("hidden")
-    export_row = ui.row().classes("gap-2 hidden")
-    current_run_id: dict[str, str | None] = {"value": None}
+    _install_page_shell()
+    request = _request()
+    query = request.query_params if request is not None else {}
 
-    with paywall:
-        ui.label("Unlock your tailored resume — $9.99").classes("text-lg font-bold")
+    state: dict[str, Any] = {
+        "run_id": query.get("run_id"),
+        "payment_id": None,
+        "poll_payment": query.get("paid") == "1" and bool(query.get("run_id")),
+    }
 
-        async def pay_stripe() -> None:
-            run_id = current_run_id["value"]
-            if not run_id:
-                return
-            async with api_client() as client:
-                resp = await client.post(
-                    "/api/v1/billing/stripe/checkout",
-                    json={"run_id": run_id},
-                )
-            if resp.status_code == 200:
-                ui.navigate.to(resp.json()["checkout_url"], new_tab=True)
-            else:
-                upload_status.set_text(f"Stripe error: {resp.text}")
+    with ui.column().classes("rb-page"):
+        with ui.column().classes("rb-shell gap-5"):
+            with ui.row().classes("items-center justify-between w-full"):
+                with ui.column().classes("gap-1"):
+                    ui.label("Resume Builder").classes("rb-title")
+                    ui.label("Upload once, tailor precisely, unlock only when needed.").classes(
+                        "rb-subtle"
+                    )
 
-        async def pay_crypto() -> None:
-            run_id = current_run_id["value"]
-            if not run_id:
-                return
-            async with api_client() as client:
-                resp = await client.post(
-                    "/api/v1/billing/crypto/invoice",
-                    json={"run_id": run_id, "pay_currency": "btc"},
-                )
-            if resp.status_code == 200:
-                data = resp.json()
-                upload_status.set_text(
-                    f"Send {data.get('pay_amount')} {data.get('pay_currency')}"
-                    f" to {data.get('pay_address')}"
-                )
-            else:
-                upload_status.set_text(f"Crypto error: {resp.text}")
+                async def do_logout() -> None:
+                    await ui.run_javascript("await window.rbFingerprint.logout();", timeout=10.0)
 
-        ui.button("Pay with Stripe", on_click=pay_stripe)
-        ui.button("Pay with Crypto", on_click=pay_crypto)
+                ui.button("Sign out", icon="logout", on_click=do_logout).props("flat")
+
+            with ui.row().classes("w-full gap-5").style("align-items: stretch;"):
+                with ui.column().classes("rb-panel gap-4").style("flex: 0 0 360px;"):
+                    ui.label("Inputs").classes("text-lg font-medium")
+                    status_label = ui.label("Loading account...").classes("rb-subtle")
+                    resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
+                    upload_status = ui.label("").classes("text-sm")
+                    upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
+                        "w-full"
+                    )
+                    jd_input = ui.textarea("Job description").props("outlined").classes("w-full")
+                    jd_input.props("autogrow")
+                    run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
+                    progress_label = ui.label("Ready").classes("rb-subtle")
+                    progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
+
+                with ui.column().classes("gap-4").style("flex: 1 1 520px; min-width: 0;"):
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("Output").classes("text-lg font-medium")
+                        export_row = ui.row().classes("gap-2 hidden")
+                    output = ui.markdown(
+                        "Upload a resume, paste a job description, then start a tailored run."
+                    ).classes("rb-panel rb-output w-full")
+                    payment_status = ui.label("").classes("rb-subtle")
+
+    paywall_dialog = ui.dialog()
+    with paywall_dialog, ui.card().classes("gap-3").style("width: min(420px, 92vw);"):
+        ui.label("Unlock full output").classes("text-lg font-medium")
+        ui.label(
+            "The run is complete, but the tailored resume stays hidden until payment confirms."
+        ).classes("rb-subtle")
+        with ui.row().classes("gap-2"):
+            stripe_button = ui.button("Stripe", icon="credit_card").props("unelevated")
+            crypto_button = ui.button("Crypto", icon="currency_bitcoin").props("outline")
+        crypto_status = ui.label("").classes("rb-subtle")
+
+    async def load_account() -> None:
+        async with api_client() as client:
+            user_resp = await client.get("/api/v1/auth/me")
+            billing_resp = await client.get("/api/v1/billing/status")
+            resumes_resp = await client.get("/api/v1/resumes")
+
+        if user_resp.status_code != 200:
+            ui.navigate.to("/login")
+            return
+
+        user = user_resp.json()
+        billing = billing_resp.json() if billing_resp.status_code == 200 else {}
+        resumes = resumes_resp.json().get("resumes", []) if resumes_resp.status_code == 200 else []
+        free_label = "used" if user.get("free_trial_used") else "available"
+        upload_label = "yes" if user.get("can_upload") else "payment required"
+        price = billing.get("price_usd", "9.99")
+        status_label.set_text(
+            f"Free trial: {free_label} · Upload: {upload_label} · Unlock: ${price}"
+        )
+        if resumes:
+            resume_label.set_text(f"Resume: {resumes[0]['filename']}")
+            state["resume_id"] = resumes[0]["resume_id"]
+
+    async def handle_upload(event: Any) -> None:
+        upload_status.set_text("Uploading resume...")
+        upload_status.classes(remove="rb-danger")
+        upload_status.classes(add="rb-subtle")
+        async with api_client() as client:
+            response = await client.post(
+                "/api/v1/resumes",
+                files={
+                    "file": (
+                        event.name,
+                        event.content.read(),
+                        event.type or "application/octet-stream",
+                    )
+                },
+            )
+        if response.status_code == 200:
+            data = response.json()
+            state["resume_id"] = data["resume_id"]
+            resume_label.set_text(f"Resume: {data['filename']}")
+            upload_status.set_text("Resume uploaded.")
+            upload_status.classes(remove="rb-danger")
+            upload_status.classes(add="rb-success")
+            await load_account()
+            return
+        upload_status.set_text(_format_detail(response.text, "Upload failed"))
+        upload_status.classes(remove="rb-subtle")
+        upload_status.classes(add="rb-danger")
+
+    upload.on_upload(handle_upload)
+
+    async def refresh_run(show_paywall: bool = False) -> dict[str, Any] | None:
+        run_id = state.get("run_id")
+        if not run_id:
+            return None
+        async with api_client() as client:
+            response = await client.get(f"/api/v1/runs/{run_id}")
+        if response.status_code != 200:
+            payment_status.set_text(_format_detail(response.text, "Could not load run"))
+            return None
+
+        body = response.json()
+        state["current_run"] = body
+        is_locked = body.get("output_locked") and not body.get("final_output")
+        if is_locked:
+            export_row.classes(add="hidden")
+            output.classes(add="rb-locked")
+            output.set_content(f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}")
+            payment_status.set_text("Payment required to reveal the full tailored resume.")
+            if show_paywall:
+                paywall_dialog.open()
+            return body
+
+        final_output = body.get("final_output") or {}
+        output.classes(remove="rb-locked")
+        output.set_content(final_output.get("plain_text") or body.get("preview_text") or "")
+        payment_status.set_text("Output is available.")
+        export_row.classes(remove="hidden")
+        export_row.clear()
+        with export_row:
+            ui.button("TXT", icon="description", on_click=lambda: do_export("txt")).props("flat")
+            docx = ui.button("DOCX", icon="article", on_click=lambda: do_export("docx")).props(
+                "flat"
+            )
+            pdf = ui.button("PDF", icon="picture_as_pdf", on_click=lambda: do_export("pdf")).props(
+                "flat"
+            )
+            if body.get("is_free_trial_run"):
+                docx.props("disable")
+                pdf.props("disable")
+        return body
 
     async def do_export(fmt: str) -> None:
-        run_id = current_run_id["value"]
+        run_id = state.get("run_id")
         if not run_id:
             return
+        payment_status.set_text(f"Preparing {fmt.upper()} export...")
         async with api_client() as client:
-            resp = await client.post("/api/v1/exports", json={"run_id": run_id, "format": fmt})
-        if resp.status_code == 200:
-            path = resp.json()["download_url"]
-            ui.navigate.to(path, new_tab=True)
-        else:
-            upload_status.set_text(f"Export failed: {resp.text}")
+            response = await client.post("/api/v1/exports", json={"run_id": run_id, "format": fmt})
+        if response.status_code == 200:
+            ui.navigate.to(response.json()["download_url"], new_tab=True)
+            payment_status.set_text(f"{fmt.upper()} export ready.")
+            return
+        payment_status.set_text(_format_detail(response.text, "Export failed"))
 
-    with export_row:
-        ui.button("Export TXT", on_click=lambda: do_export("txt"))
-        ui.button("Export DOCX", on_click=lambda: do_export("docx"))
-        ui.button("Export PDF", on_click=lambda: do_export("pdf"))
-
-    async def load_status() -> None:
+    async def pay_stripe() -> None:
+        run_id = state.get("run_id")
+        if not run_id:
+            return
+        stripe_button.props("loading")
         async with api_client() as client:
-            resp = await client.get("/api/v1/auth/me")
-            billing = await client.get("/api/v1/billing/status")
-        if resp.status_code == 200:
-            data = resp.json()
-            bill = billing.json() if billing.status_code == 200 else {}
-            status_label.set_text(
-                f"Free trial used: {data.get('free_trial_used')} | "
-                f"Can upload: {data.get('can_upload')} | "
-                f"Price: ${bill.get('price_usd', '9.99')}"
+            response = await client.post("/api/v1/billing/stripe/checkout", json={"run_id": run_id})
+        stripe_button.props(remove="loading")
+        if response.status_code == 200:
+            ui.navigate.to(response.json()["checkout_url"], new_tab=True)
+            payment_status.set_text("Waiting for Stripe confirmation...")
+            state["poll_payment"] = True
+            return
+        crypto_status.set_text(_format_detail(response.text, "Stripe checkout failed"))
+
+    async def pay_crypto() -> None:
+        run_id = state.get("run_id")
+        if not run_id:
+            return
+        crypto_button.props("loading")
+        async with api_client() as client:
+            response = await client.post(
+                "/api/v1/billing/crypto/invoice",
+                json={"run_id": run_id, "pay_currency": "btc"},
             )
-
-    async def handle_upload(e) -> None:
-        async with api_client() as client:
-            resp = await client.post(
-                "/api/v1/resumes",
-                files={"file": (e.name, e.content.read(), e.type or "application/octet-stream")},
+        crypto_button.props(remove="loading")
+        if response.status_code == 200:
+            data = response.json()
+            state["payment_id"] = data["payment_id"]
+            state["poll_payment"] = True
+            amount = data.get("pay_amount")
+            currency = data.get("pay_currency")
+            address = data.get("pay_address")
+            crypto_status.set_text(
+                f"Send {amount} {currency} to {address}"
             )
-        if resp.status_code == 200:
-            upload_status.set_text(f"Uploaded: {resp.json().get('filename')}")
-        else:
-            upload_status.set_text(f"Upload failed: {resp.text}")
+            return
+        crypto_status.set_text(_format_detail(response.text, "Crypto invoice failed"))
 
-    ui.upload(on_upload=handle_upload, auto_upload=True).classes("w-full")
-    ui.timer(0.1, load_status, once=True)
+    stripe_button.on_click(pay_stripe)
+    crypto_button.on_click(pay_crypto)
+
+    async def stream_progress(run_id: str) -> None:
+        current_event = ""
+        async with api_client() as client:
+            async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as stream:
+                async for line in stream.aiter_lines():
+                    if line.startswith("event: "):
+                        current_event = line.removeprefix("event: ")
+                    elif line.startswith("data: "):
+                        payload = json.loads(line.removeprefix("data: ") or "{}")
+                        if current_event == "progress":
+                            node = payload.get("node")
+                            verb = "Started" if payload.get("event") == "node_start" else "Done"
+                            progress_label.set_text(f"{verb}: {STEPS.get(node, node or 'step')}")
+                            progress.value = min(float(progress.value or 0) + 0.18, 0.9)
+                        elif current_event == "done":
+                            progress.value = 1
+                            progress_label.set_text("Run complete")
+                            return
+                        elif current_event == "error":
+                            progress_label.set_text(str(payload.get("message", "Run failed")))
+                            return
 
     async def tailor() -> None:
-        jd = (jd_input.value or "").strip()
-        if len(jd) < 20:
+        jd_text = (jd_input.value or "").strip()
+        if len(jd_text) < 20:
             output.set_content("Job description must be at least 20 characters.")
             return
-        output.set_content("_Processing..._")
-        paywall.classes(add="hidden")
+        if not state.get("resume_id"):
+            await load_account()
+        resume_id = state.get("resume_id")
+        if not resume_id:
+            output.set_content("Upload a resume before tailoring.")
+            return
+
+        run_button.props("loading")
+        progress.value = 0.05
+        progress_label.set_text("Creating run")
+        payment_status.set_text("")
+        output.classes(remove="rb-locked")
+        output.set_content("Starting the tailoring workflow...")
+        paywall_dialog.close()
         export_row.classes(add="hidden")
 
         async with api_client() as client:
-            resumes_resp = await client.get("/api/v1/resumes")
-            resumes = resumes_resp.json().get("resumes", [])
-            if not resumes:
-                output.set_content("Upload a resume first.")
-                return
-            run_resp = await client.post(
+            response = await client.post(
                 "/api/v1/runs",
-                json={"resume_id": resumes[0]["resume_id"], "jd_text": jd},
+                json={"resume_id": resume_id, "jd_text": jd_text},
             )
-            if run_resp.status_code != 200:
-                output.set_content(f"Error: {run_resp.text}")
-                return
-            run_data = run_resp.json()
-            run_id = run_data["run_id"]
-            current_run_id["value"] = run_id
+        if response.status_code != 200:
+            run_button.props(remove="loading")
+            output.set_content(_format_detail(response.text, "Could not start run"))
+            return
 
-            stream_text = []
-            async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as stream:
-                async for line in stream.aiter_lines():
-                    if line.startswith("data: "):
-                        stream_text.append(line[6:])
-                    if line.startswith("event: done") or line.startswith("event: error"):
-                        break
+        data = response.json()
+        state["run_id"] = data["run_id"]
+        try:
+            await stream_progress(data["run_id"])
+        finally:
+            run_button.props(remove="loading")
+        await refresh_run(show_paywall=True)
+        await load_account()
 
-            detail = await client.get(f"/api/v1/runs/{run_id}")
-            if detail.status_code != 200:
-                output.set_content(f"Error loading run: {detail.text}")
-                return
-            body = detail.json()
-            if body.get("output_locked") and not body.get("final_output"):
-                paywall.classes(remove="hidden")
-                output.set_content(
-                    f"**Preview (locked):**\n\n{body.get('preview_text', '')[:400]}"
-                )
-                output.classes(add="blur-sm")
-            else:
-                fo = body.get("final_output") or {}
-                output.set_content(fo.get("plain_text", body.get("preview_text", "")))
-                output.classes(remove="blur-sm")
-                export_row.classes(remove="hidden")
+    run_button.on_click(tailor)
 
-    ui.button("Tailor Resume", on_click=tailor)
+    async def poll_after_payment() -> None:
+        if not state.get("poll_payment"):
+            return
+        body = await refresh_run(show_paywall=False)
+        if body and not body.get("output_locked"):
+            state["poll_payment"] = False
+            paywall_dialog.close()
+            payment_status.set_text("Payment confirmed. Output unlocked.")
+            await load_account()
+        else:
+            payment_status.set_text("Waiting for payment confirmation...")
+
+    ui.timer(0.1, load_account, once=True)
+    ui.timer(0.1, lambda: ui.run_javascript("window.rbFingerprint.get();"), once=True)
+    ui.timer(2.5, poll_after_payment)
+    if state.get("run_id"):
+        ui.timer(0.2, lambda: refresh_run(show_paywall=state["poll_payment"]), once=True)
 
 
 def register_ui() -> None:
