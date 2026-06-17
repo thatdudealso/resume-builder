@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from packages.agent.sections.orchestrator import pick_variant_sections
 
 

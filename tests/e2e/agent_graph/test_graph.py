@@ -7,7 +7,6 @@ from packages.agent.graph import run_agent
 from packages.agent.schemas.variants import SECTION_KEYS
 from packages.agent.service import AgentService
 
-
 _INITIAL = {
     "run_id": "r1",
     "user_id": "u1",
@@ -40,7 +39,11 @@ async def test_agent_graph_e2e():
 
 
 @pytest.mark.asyncio
-async def test_agent_graph_respects_provider_selection():
+async def test_agent_graph_respects_provider_selection(monkeypatch):
+    monkeypatch.setattr(
+        "packages.agent.providers.openai_provider.OpenAIProvider.is_configured",
+        lambda self: False,
+    )
     initial = {**_INITIAL, "llm_provider": "openai"}
     service = AgentService("openai")
     result = await run_agent(initial, service)

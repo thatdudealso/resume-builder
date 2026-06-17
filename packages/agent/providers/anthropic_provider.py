@@ -30,15 +30,15 @@ class AnthropicProvider(LLMProvider):
 
         client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         system = "Respond with valid JSON only." if json_mode else None
-        kwargs: dict[str, object] = {
+        create_kwargs: dict[str, object] = {
             "model": self.model_for_task(task),
             "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}],
         }
-        if system:
-            kwargs["system"] = system
-        msg = await client.messages.create(**kwargs)
+        if system is not None:
+            create_kwargs["system"] = system
+        msg = await client.messages.create(**create_kwargs)  # type: ignore[call-overload]
         block = msg.content[0]
         if hasattr(block, "text"):
-            return block.text
+            return str(block.text)
         return str(block)

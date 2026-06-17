@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.analysis import JDAnalysis, JDRequirement, WeightedKeyword
 from packages.agent.state import extract_keywords
 from packages.agent.utils.json_parse import parse_json_response
 
 JD_ANALYST_PROMPT = """Analyze this job description and return JSON only with keys:
-must_have (list of {requirement, category}), nice_to_have (same shape),
+must_have (list of {{requirement, category}}), nice_to_have (same shape),
 role_type (ic|manager|hybrid|unknown), seniority_level (junior|mid|senior|lead|executive|unknown),
 responsibilities (list of strings), dealbreakers (list of strings),
-keywords_weighted (list of {term, weight} where weight is 0-1).
+keywords_weighted (list of {{term, weight}} where weight is 0-1).
 
 Job description:
 {jd_text}
@@ -24,12 +26,14 @@ def fallback_jd_analysis(jd_text: str) -> JDAnalysis:
     ]
     must_have: list[JDRequirement] = []
     for term in keywords[:5]:
-        category = "years" if "year" in term else "skill"
+        category: Literal["skill", "cert", "education", "years", "other"] = (
+            "years" if "year" in term else "skill"
+        )
         must_have.append(JDRequirement(requirement=term, category=category))
     nice_to_have = [
         JDRequirement(requirement=term, category="skill") for term in keywords[5:12]
     ]
-    seniority = "unknown"
+    seniority: Literal["junior", "mid", "senior", "lead", "executive", "unknown"] = "unknown"
     lowered = jd_text.lower()
     if "senior" in lowered or "sr." in lowered:
         seniority = "senior"
@@ -39,7 +43,9 @@ def fallback_jd_analysis(jd_text: str) -> JDAnalysis:
         seniority = "lead"
     elif "manager" in lowered or "director" in lowered:
         seniority = "executive"
-    role_type = "manager" if "manager" in lowered or "lead team" in lowered else "ic"
+    role_type: Literal["ic", "manager", "hybrid", "unknown"] = (
+        "manager" if "manager" in lowered or "lead team" in lowered else "ic"
+    )
     return JDAnalysis(
         must_have=must_have,
         nice_to_have=nice_to_have,

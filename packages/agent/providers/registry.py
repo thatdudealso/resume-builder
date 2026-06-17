@@ -6,7 +6,7 @@ from packages.agent.providers.gemini_provider import GeminiProvider
 from packages.agent.providers.grok_provider import GrokProvider
 from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
-from packages.agent.schemas.providers import DEFAULT_PROVIDER, LLMProviderName, PROVIDER_LABELS
+from packages.agent.schemas.providers import DEFAULT_PROVIDER, PROVIDER_LABELS, LLMProviderName
 
 _PROVIDER_FACTORIES: dict[LLMProviderName, type[LLMProvider]] = {
     LLMProviderName.OPENAI: OpenAIProvider,

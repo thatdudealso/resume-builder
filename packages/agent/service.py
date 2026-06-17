@@ -41,11 +41,14 @@ class AgentService:
 
     def score_match(
         self,
-        jd_analysis: JDAnalysis | dict,
-        resume_analysis: ResumeAnalysis | dict,
+        jd_analysis: JDAnalysis | dict[str, object],
+        resume_analysis: ResumeAnalysis | dict[str, object],
         resume_text: str,
     ) -> MatchScoreResult:
-        jd = jd_analysis if isinstance(jd_analysis, JDAnalysis) else JDAnalysis.model_validate(jd_analysis)
+        if isinstance(jd_analysis, JDAnalysis):
+            jd = jd_analysis
+        else:
+            jd = JDAnalysis.model_validate(jd_analysis)
         resume = (
             resume_analysis
             if isinstance(resume_analysis, ResumeAnalysis)

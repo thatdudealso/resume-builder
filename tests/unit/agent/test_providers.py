@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from packages.agent.providers.registry import get_provider, list_provider_options, resolve_provider_name
+from packages.agent.providers.registry import (
+    get_provider,
+    list_provider_options,
+    resolve_provider_name,
+)
 from packages.agent.schemas.providers import DEFAULT_PROVIDER, LLMProviderName
 
 

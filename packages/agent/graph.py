@@ -53,7 +53,8 @@ def build_graph(
     async def rewrite_node(state: AgentState) -> AgentState:
         if on_progress:
             await on_progress({"event": "node_start", "node": "rewrite_sections"})
-        seeded = {**state, "selected_variant": state.get("selected_variant") or DEFAULT_VARIANT.value}
+        selected_variant = state.get("selected_variant") or DEFAULT_VARIANT.value
+        seeded = {**state, "selected_variant": selected_variant}
         result = await rewrite_sections(seeded, agent_service)
         if on_progress:
             await on_progress({"event": "node_complete", "node": "rewrite_sections"})

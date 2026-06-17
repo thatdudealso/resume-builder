@@ -1,23 +1,28 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from uuid import UUID
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from packages.agent.changelog.builder import build_sections_editable
 from packages.agent.nodes.format_output import format_output
-from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS, VARIANT_ORDER, VariantName
+from packages.agent.schemas.variants import (
+    DEFAULT_VARIANT,
+    SECTION_KEYS,
+    VariantName,
+)
 from packages.agent.sections.orchestrator import retailor_section
 from packages.agent.service import AgentService
-from packages.agent.state import split_sections
+from packages.agent.state import AgentState, split_sections
 from packages.core.security.sanitization import sanitize_text
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.resume import MasterResume
 
 
 def _plain_text(sections: dict[str, str]) -> str:
-    return "\n\n".join(f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key))
+    return "\n\n".join(
+        f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key)
+    )
 
 
 def _rebuild_final_output(
@@ -29,26 +34,27 @@ def _rebuild_final_output(
     variants: dict[str, dict[str, str]],
     overrides: dict[str, str],
     missing: list[str],
-) -> dict:
+) -> dict[str, Any]:
     original_sections = split_sections(resume.raw_text)
-    state = {
+    final_output = run.final_output or {}
+    state: AgentState = {
         "master_resume_text": resume.raw_text,
         "master_resume_structured": original_sections,
         "jd_text": run.jd_text,
-        "jd_analysis": (run.final_output or {}).get("jd_analysis"),
-        "resume_analysis": (run.final_output or {}).get("resume_analysis"),
-        "match_score_before": (run.final_output or {}).get("match_score", {}).get("previous"),
+        "jd_analysis": final_output.get("jd_analysis") or {},
+        "resume_analysis": final_output.get("resume_analysis") or {},
+        "match_score_before": final_output.get("match_score", {}).get("previous") or {},
         "sections_missing": missing,
         "variants": variants,
         "selected_variant": selected_variant,
         "user_section_overrides": overrides,
-        "jd_keywords": (run.final_output or {}).get("keywords_used", []),
+        "jd_keywords": final_output.get("keywords_used", []),
     }
     formatted = format_output(state, agent_service)
-    return formatted["final_output"]
+    return cast(dict[str, Any], formatted["final_output"])
 
 
-async def select_variant(session: AsyncSession, run: AgentRun, variant: str) -> dict:
+async def select_variant(session: AsyncSession, run: AgentRun, variant: str) -> dict[str, Any]:
     try:
         VariantName(variant)
     except ValueError as exc:
@@ -80,7 +86,7 @@ async def update_section_override(
     *,
     section: str,
     content: str,
-) -> dict:
+) -> dict[str, Any]:
     if section not in SECTION_KEYS:
         raise ValueError("Invalid section")
     final = deepcopy(run.final_output or {})
@@ -111,7 +117,7 @@ async def add_section_and_retailor(
     *,
     section: str,
     content: str,
-) -> dict:
+) -> dict[str, Any]:
     if section not in SECTION_KEYS:
         raise ValueError("Invalid section")
     agent_service = AgentService(run.llm_provider)
@@ -120,7 +126,7 @@ async def add_section_and_retailor(
     if section in missing:
         missing.remove(section)
 
-    state = {
+    state: AgentState = {
         "jd_text": run.jd_text,
         "keyword_gaps": final.get("keywords_used", []),
         "sections_missing": missing,

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 
-def parse_json_response(raw: str) -> dict:
+def parse_json_response(raw: str) -> dict[str, Any]:
     text = raw.strip()
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
     if fence:

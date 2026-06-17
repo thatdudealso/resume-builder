@@ -7,7 +7,9 @@ from packages.agent.state import AgentState, split_sections
 
 
 def _plain_text(sections: dict[str, str]) -> str:
-    return "\n\n".join(f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key))
+    return "\n\n".join(
+        f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key)
+    )
 
 
 def format_output(state: AgentState, agent_service: AgentService | None = None) -> AgentState:

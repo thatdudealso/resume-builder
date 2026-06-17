@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS, VARIANT_ORDER, VariantName
+from packages.agent.schemas.variants import (
+    DEFAULT_VARIANT,
+    SECTION_KEYS,
+    VARIANT_ORDER,
+)
 from packages.agent.sections.agent import rewrite_section
 from packages.agent.service import AgentService
 from packages.agent.state import AgentState
@@ -33,7 +37,9 @@ def _sections_to_tailor(
     return tailored
 
 
-async def build_all_variants(state: AgentState, agent_service: AgentService) -> dict[str, dict[str, str]]:
+async def build_all_variants(
+    state: AgentState, agent_service: AgentService
+) -> dict[str, dict[str, str]]:
     sources = _source_sections(state)
     missing = state.get("sections_missing") or []
     user_added = state.get("user_added_sections") or {}

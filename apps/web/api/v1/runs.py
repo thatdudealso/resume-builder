@@ -11,7 +11,11 @@ from starlette.responses import StreamingResponse
 
 from apps.web.config import settings
 from apps.web.dependencies import get_current_user, get_db
-from apps.web.services.run_editor import add_section_and_retailor, select_variant, update_section_override
+from apps.web.services.run_editor import (
+    add_section_and_retailor,
+    select_variant,
+    update_section_override,
+)
 from apps.web.services.run_executor import execute_run, get_run_queue
 from packages.agent.providers.registry import get_provider, list_provider_options
 from packages.agent.schemas.providers import DEFAULT_PROVIDER, LLMProviderName

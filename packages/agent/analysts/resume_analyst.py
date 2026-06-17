@@ -1,13 +1,22 @@
 from __future__ import annotations
 
-from packages.agent.analysts.jd_analyst import fallback_jd_analysis
+from packages.agent.providers.base import AgentTask, LLMProvider
+from packages.agent.schemas.analysis import (
+    JDAnalysis,
+    RequirementEvidence,
+    ResumeAnalysis,
+    ResumeRole,
+)
 from packages.agent.state import split_sections
 from packages.agent.utils.json_parse import parse_json_response
 
 _SECTION_KEYS = ("summary", "experience", "skills", "education")
 
 
-def fallback_resume_analysis(resume_text: str, jd_analysis: JDAnalysis | None = None) -> ResumeAnalysis:
+def fallback_resume_analysis(
+    resume_text: str,
+    jd_analysis: JDAnalysis | None = None,
+) -> ResumeAnalysis:
     sections = split_sections(resume_text)
     sections_present = {key: bool(sections.get(key, "").strip()) for key in _SECTION_KEYS}
     sections_missing = [key for key, present in sections_present.items() if not present]
@@ -40,7 +49,14 @@ def fallback_resume_analysis(resume_text: str, jd_analysis: JDAnalysis | None = 
     experience = sections.get("experience", "")
     roles: list[ResumeRole] = []
     if experience:
-        roles.append(ResumeRole(title="Experience", company="", dates="", bullets=experience.splitlines()[:8]))
+        roles.append(
+            ResumeRole(
+                title="Experience",
+                company="",
+                dates="",
+                bullets=experience.splitlines()[:8],
+            )
+        )
 
     return ResumeAnalysis(
         sections_present=sections_present,
@@ -54,13 +70,13 @@ def fallback_resume_analysis(resume_text: str, jd_analysis: JDAnalysis | None = 
 
 
 RESUME_ANALYST_PROMPT = """Analyze this resume text and return JSON only with keys:
-sections_present ({summary, experience, skills, education booleans}),
+sections_present ({{summary, experience, skills, education booleans}}),
 sections_missing (list of section names that are absent),
 seniority_inferred (junior|mid|senior|lead|executive|unknown),
-roles (list of {title, company, dates, bullets}),
+roles (list of {{title, company, dates, bullets}}),
 skills (list of strings),
 education (list of strings),
-requirement_evidence (list of {requirement, status: met|partial|missing, evidence_quote}).
+requirement_evidence (list of {{requirement, status: met|partial|missing, evidence_quote}}).
 
 Must-have requirements from JD:
 {must_have}

@@ -48,7 +48,9 @@ class ResumeAnalysis(BaseModel):
         }
     )
     sections_missing: list[str] = Field(default_factory=list)
-    seniority_inferred: Literal["junior", "mid", "senior", "lead", "executive", "unknown"] = "unknown"
+    seniority_inferred: Literal[
+        "junior", "mid", "senior", "lead", "executive", "unknown"
+    ] = "unknown"
     roles: list[ResumeRole] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     education: list[str] = Field(default_factory=list)

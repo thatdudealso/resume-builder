@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import httpx
-
 from apps.web.config import settings
 from packages.agent.providers._http import openai_compatible_chat
 from packages.agent.providers._mock import mock_complete

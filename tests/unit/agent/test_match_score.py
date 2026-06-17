@@ -8,7 +8,9 @@ from packages.agent.scoring.match_score import compute_match_score
 
 
 def test_match_score_returns_weighted_overall():
-    jd = fallback_jd_analysis("Senior Python API developer with PostgreSQL and 5 years experience required.")
+    jd = fallback_jd_analysis(
+        "Senior Python API developer with PostgreSQL and 5 years experience required."
+    )
     resume = fallback_resume_analysis(
         "SUMMARY\nEngineer\nEXPERIENCE\nBuilt Python APIs 2020-2022\nSKILLS\nPython, SQL",
         jd,

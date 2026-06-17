@@ -34,8 +34,12 @@ def _must_have_score(resume_analysis: ResumeAnalysis) -> tuple[float, str]:
 
 
 def _skills_score(jd_analysis: JDAnalysis, resume_analysis: ResumeAnalysis) -> tuple[float, str]:
-    required = [item.requirement.lower() for item in jd_analysis.must_have if item.category == "skill"]
-    preferred = [item.requirement.lower() for item in jd_analysis.nice_to_have if item.category == "skill"]
+    required = [
+        item.requirement.lower() for item in jd_analysis.must_have if item.category == "skill"
+    ]
+    preferred = [
+        item.requirement.lower() for item in jd_analysis.nice_to_have if item.category == "skill"
+    ]
     if not required and not preferred:
         required = [item.term.lower() for item in jd_analysis.keywords_weighted[:8]]
     resume_skills = {skill.lower() for skill in resume_analysis.skills}
@@ -70,14 +74,21 @@ def _seniority_score(jd_analysis: JDAnalysis, resume_analysis: ResumeAnalysis) -
     resume_rank = _SENIORITY_RANK.get(resume_analysis.seniority_inferred, 2)
     diff = abs(jd_rank - resume_rank)
     score = max(0.0, 100.0 - diff * 25.0)
-    return round(score, 2), f"JD {jd_analysis.seniority_level} vs resume {resume_analysis.seniority_inferred}"
+    return round(score, 2), (
+        f"JD {jd_analysis.seniority_level} vs resume {resume_analysis.seniority_inferred}"
+    )
 
 
 def _dealbreaker_flags(jd_analysis: JDAnalysis, resume_analysis: ResumeAnalysis) -> list[str]:
     flags: list[str] = []
-    missing = {item.requirement.lower() for item in resume_analysis.requirement_evidence if item.status == "missing"}
+    missing = {
+        item.requirement.lower()
+        for item in resume_analysis.requirement_evidence
+        if item.status == "missing"
+    }
     for breaker in jd_analysis.dealbreakers:
-        if breaker.lower() in missing or breaker.lower() in {m.lower() for m in resume_analysis.sections_missing}:
+        missing_sections = {m.lower() for m in resume_analysis.sections_missing}
+        if breaker.lower() in missing or breaker.lower() in missing_sections:
             flags.append(breaker)
     return flags
 
@@ -98,8 +109,18 @@ def compute_match_score(
     seniority_score, seniority_detail = _seniority_score(jd_analysis, resume_analysis)
 
     components = [
-        MatchComponentScore(name="must_have", score=must_score, weight=_COMPONENT_WEIGHTS["must_have"], detail=must_detail),
-        MatchComponentScore(name="skills", score=skills_score, weight=_COMPONENT_WEIGHTS["skills"], detail=skills_detail),
+        MatchComponentScore(
+            name="must_have",
+            score=must_score,
+            weight=_COMPONENT_WEIGHTS["must_have"],
+            detail=must_detail,
+        ),
+        MatchComponentScore(
+            name="skills",
+            score=skills_score,
+            weight=_COMPONENT_WEIGHTS["skills"],
+            detail=skills_detail,
+        ),
         MatchComponentScore(
             name="experience_relevance",
             score=exp_score,
