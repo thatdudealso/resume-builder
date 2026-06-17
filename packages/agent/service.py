@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from packages.agent.analysts.input_analyst import analyze_inputs_combined
 from packages.agent.analysts.jd_analyst import analyze_jd
 from packages.agent.analysts.resume_analyst import analyze_resume
 from packages.agent.providers.base import AgentTask, LLMProvider
@@ -29,8 +30,11 @@ class AgentService:
         return await analyze_resume(resume_text, jd_analysis, self.provider)
 
     async def analyze_inputs(self, jd_text: str, resume_text: str) -> dict[str, object]:
-        jd_analysis = await self.analyze_jd(jd_text)
-        resume_analysis = await self.analyze_resume(resume_text, jd_analysis)
+        jd_analysis, resume_analysis = await analyze_inputs_combined(
+            jd_text,
+            resume_text,
+            self.provider,
+        )
         match_before = self.score_match(jd_analysis, resume_analysis, resume_text)
         return {
             "jd_analysis": jd_analysis.model_dump(),
@@ -60,5 +64,5 @@ class AgentService:
         return {
             "id": self.provider_name.value,
             "rewrite_model": self.provider.model_for_task(AgentTask.SECTION_REWRITE),
-            "analysis_model": self.provider.model_for_task(AgentTask.JD_ANALYSIS),
+            "analysis_model": self.provider.model_for_task(AgentTask.INPUT_ANALYSIS),
         }

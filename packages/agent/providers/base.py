@@ -7,6 +7,7 @@ from packages.agent.schemas.providers import LLMProviderName
 
 
 class AgentTask(StrEnum):
+    INPUT_ANALYSIS = "input_analysis"
     JD_ANALYSIS = "jd_analysis"
     RESUME_ANALYSIS = "resume_analysis"
     SECTION_REWRITE = "section_rewrite"

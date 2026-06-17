@@ -6,6 +6,7 @@ from packages.agent.schemas.providers import LLMProviderName
 from packages.integrations.hf_inference import complete as hf_complete
 
 _TASK_MODELS: dict[AgentTask, str] = {
+    AgentTask.INPUT_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.JD_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.RESUME_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.SECTION_REWRITE: "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
