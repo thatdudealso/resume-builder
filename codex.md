@@ -13,6 +13,13 @@ Use it before changing code, opening PRs, or updating generated documentation.
 - Do not commit `.env`, secrets, `.agents/`, or `docs/dev/**` to `main`.
 - Keep implementation changes scoped to the selected feature branch.
 
+## Current Status
+
+- Active frontend branch: `feature/nicegui-paywall-polish`.
+- Open PR: [#3](https://github.com/thatdudealso/resume-builder/pull/3) into `develop`.
+- Current frontend rule: one `/app/` page only, with no user-facing login,
+  registration, account, dashboard, password, or logout flow.
+
 ## Frontend Rules
 
 - Keep the NiceGUI app minimal, focused, and operational; do not build a marketing page.

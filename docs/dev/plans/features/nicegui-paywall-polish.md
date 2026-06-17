@@ -33,4 +33,5 @@ User can upload, tailor, pay, see full output, and export without login, account
   dialog. Export controls remain hidden until output is viewable.
 - Stripe return URLs at `/app/?paid=1&run_id=...` trigger polling until the run is
   unlocked by backend webhook processing.
-- Browser E2E still needs verification with a running Docker/local stack.
+- In-app browser smoke passed against the local `/app/` stack with no console
+  errors and no visible login/account UI.

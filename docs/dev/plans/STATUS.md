@@ -1,6 +1,6 @@
 # Resume Builder — Implementation Status
 
-**Last updated:** 2026-06-16
+**Last updated:** 2026-06-17
 **Integration branch:** `develop`
 **Production branch:** `main` (promoted from `qa` only)
 
@@ -12,10 +12,10 @@
 | Auth + AccessService paywall | Done |
 | LangGraph 4-node agent | Done |
 | LangGraph Postgres checkpointer | **PR open** → `feature/langgraph-postgres-checkpointer` |
-| NiceGUI single-page app | Built on `feature/nicegui-paywall-polish`; PR pending |
+| NiceGUI single-page app | **PR #3 open** → `feature/nicegui-paywall-polish` |
 | Stripe + crypto payments | Done (webhooks + billing API) |
 | Exports TXT/DOCX/PDF | Done |
-| Test coverage gate | **85.94%** (94 tests) |
+| Test suite | **89 passed** locally on `feature/nicegui-paywall-polish` |
 | CI workflows | Committed (Docker CI unverified locally) |
 | AWS deploy artifacts | Skeleton only |
 
@@ -28,7 +28,7 @@
 | auth-access | JWT, migrations, AccessService | **Done** | |
 | langgraph-agent | 4-node graph, HF, SSE | **Done** | |
 | langgraph-checkpointer | AsyncPostgresSaver wired into graph + run_executor | **PR #2 open** | `feature/langgraph-postgres-checkpointer` → develop |
-| nicegui-ui | Single `/app/` page, device workspace, upload, SSE, paywall, post-payment polling, export gating | **Built** | `feature/nicegui-paywall-polish`; PR pending |
+| nicegui-ui | Single `/app/` page, device workspace, upload, SSE, paywall, post-payment polling, export gating | **PR #3 open** | `feature/nicegui-paywall-polish` → develop |
 | payments | Stripe + NOWPayments | **Done** | |
 | exports-infra | Exports, S3, rate limit, headers | **Done** | |
 | testing-ci | 85% gate, GHA workflows | **Partial** | Docker verify → `feature/docker-ci-verify` |
@@ -44,14 +44,34 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | Branch | Scope | Status |
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | `AsyncPostgresSaver` wired into `build_graph` / `run_agent` / `execute_run`; `get_checkpointer()` util; 6 new tests | **PR #2 open** |
-| `feature/nicegui-paywall-polish` | Single `/app/` workflow, no login/account UI, SSE UX, post-payment polling, device fingerprint JS | Built; browser smoke passed |
+| `feature/nicegui-paywall-polish` | Single `/app/` workflow, no login/account UI, SSE UX, post-payment polling, device fingerprint JS | **PR #3 open; browser smoke passed; latest implementation commit `a9a04d1`** |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql` export, ER diagram, `verify_docs` CI check | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + optional `gh` setup script | Not started |
 | `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager per env | Not started |
 
-## What was completed in the last session (2026-06-15)
+## Current active work (2026-06-17)
+
+### `feature/nicegui-paywall-polish`
+**Goal:** Complete the frontend as one home/landing page where all product functionality lives, with no user-facing login, registration, account, dashboard, password, or logout flow.
+
+**Current state:**
+- **PR:** [#3](https://github.com/thatdudealso/resume-builder/pull/3) → `develop`
+- **Latest implementation commit:** `a9a04d1 Trim landing step copy`
+- **Latest status-doc commit:** `efac25c Update project status for frontend PR`
+- **Frontend:** `/app/` is the only NiceGUI product page; it contains upload, job-description input, tailor action, output, paywall, payment polling, and exports.
+- **Identity model:** protected APIs create or reuse a private device workspace from `rb_device_fingerprint` / `X-Device-Fingerprint` when no token is present.
+- **Explicitly forbidden:** do not add user-facing login, registration, account creation, dashboard pages, password fields, or logout controls.
+- **Recent UI tweak:** the `2. Tailor` and `3. Unlock` step cards intentionally have no description copy.
+
+**Validation completed:**
+- `PYTHONPATH=. .venv/bin/pytest -q` → 89 passed, 1 warning
+- `ruff check` on changed Python files → passed
+- In-app browser smoke → `/app/` has upload, job description, tailor, and output controls; no visible login/sign-in/register/account/password/logout/dashboard text; no console errors.
+- Direct no-login API smoke → `GET /api/v1/auth/me` with `X-Device-Fingerprint` returns a device workspace.
+
+## Previous completed work (2026-06-15)
 
 ### `feature/langgraph-postgres-checkpointer`
 **Goal:** Resume agent runs survive container restarts — keyed by `run_id` as LangGraph `thread_id`.
