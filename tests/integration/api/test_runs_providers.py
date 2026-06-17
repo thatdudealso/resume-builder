@@ -75,6 +75,67 @@ async def test_create_run_rejects_unconfigured_openai(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_run_rejects_invalid_variant(client, monkeypatch):
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "bad-variant@test.com", "password": "password123"},
+        headers={"X-Device-Fingerprint": "fp"},
+    )
+    monkeypatch.setattr(
+        "apps.web.api.v1.resumes.extract_text_from_upload",
+        lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
+    )
+    monkeypatch.setattr("apps.web.api.v1.resumes.upload_bytes", lambda k, d, c: k)
+    upload = await client.post(
+        "/api/v1/resumes",
+        files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},
+    )
+    resp = await client.post(
+        "/api/v1/runs",
+        json={
+            "resume_id": upload.json()["resume_id"],
+            "jd_text": "Python developer " * 5,
+            "variant": "aggressive",
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Invalid variant"
+
+
+@pytest.mark.asyncio
+async def test_create_run_returns_selected_variant(client, monkeypatch):
+    await client.post(
+        "/api/v1/auth/register",
+        json={"email": "variant-create@test.com", "password": "password123"},
+        headers={"X-Device-Fingerprint": "fp"},
+    )
+    monkeypatch.setattr(
+        "apps.web.api.v1.resumes.extract_text_from_upload",
+        lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
+    )
+    monkeypatch.setattr("apps.web.api.v1.resumes.upload_bytes", lambda k, d, c: k)
+    upload = await client.post(
+        "/api/v1/resumes",
+        files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},
+    )
+
+    async def noop_run(run_id, variant=None):
+        return None
+
+    monkeypatch.setattr("apps.web.api.v1.runs._run_background", noop_run)
+    resp = await client.post(
+        "/api/v1/runs",
+        json={
+            "resume_id": upload.json()["resume_id"],
+            "jd_text": "Python developer " * 5,
+            "variant": "bold",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["variant"] == "bold"
+
+
+@pytest.mark.asyncio
 async def test_patch_variant_when_unlocked(client, monkeypatch):
     await client.post(
         "/api/v1/auth/register",
@@ -92,7 +153,7 @@ async def test_patch_variant_when_unlocked(client, monkeypatch):
     )
     resume_id = upload.json()["resume_id"]
 
-    async def fast_run(run_id):
+    async def fast_run(run_id, variant=None):
         import packages.db.session as db_session
         from packages.db.models.agent_run import AgentRun
 

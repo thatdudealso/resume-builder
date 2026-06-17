@@ -29,9 +29,8 @@ async def test_agent_graph_e2e():
     assert result.get("match_score_after")
     final = result["final_output"]
     assert "variants" in final
-    assert "conservative" in final["variants"]
     assert "balanced" in final["variants"]
-    assert "bold" in final["variants"]
+    assert len(final["variants"]) == 1
     assert final.get("changelog") is not None
     match = final["match_score"]
     assert match["previous_overall"] is not None

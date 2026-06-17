@@ -85,7 +85,7 @@ async def test_export_docx_and_billing_poll(client, monkeypatch):
     )
     resume_id = upload.json()["resume_id"]
 
-    async def bg(run_id):
+    async def bg(run_id, variant=None):
         import packages.db.session as db_session
         from packages.db.models.agent_run import AgentRun
 

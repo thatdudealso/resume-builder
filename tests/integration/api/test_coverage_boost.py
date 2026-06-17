@@ -56,7 +56,7 @@ async def test_auth_refresh_errors(client):
 async def test_export_locked_and_download(client, monkeypatch):
     monkeypatch.setattr("apps.web.api.v1.exports.upload_bytes", lambda k, d, c: k)
     monkeypatch.setattr("apps.web.api.v1.exports.presigned_url", lambda k: "https://s3.test/file")
-    async def noop_background(run_id):
+    async def noop_background(run_id, variant=None):
         return None
 
     monkeypatch.setattr("apps.web.api.v1.runs._run_background", noop_background)
@@ -133,7 +133,7 @@ async def test_run_stream_and_unlock(client, monkeypatch):
     )
     resume_id = upload.json()["resume_id"]
 
-    async def bg(run_id):
+    async def bg(run_id, variant=None):
         from apps.web.services.run_executor import get_run_queue
 
         queue = get_run_queue(str(run_id))
@@ -232,7 +232,7 @@ async def test_run_get_with_final_output(client, monkeypatch):
     )
     resume_id = upload.json()["resume_id"]
 
-    async def bg(run_id):
+    async def bg(run_id, variant=None):
         import packages.db.session as db_session
         from packages.db.models.agent_run import AgentRun
 
