@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
+from apps.web.config import settings
 from apps.web.dependencies import get_current_user, get_db
 from apps.web.services.run_executor import execute_run, get_run_queue
 from packages.core.access.service import AccessService
@@ -145,5 +146,5 @@ async def unlock_run(
         "run_id": str(run_id),
         "stripe_checkout": "/api/v1/billing/stripe/checkout",
         "crypto_invoice": "/api/v1/billing/crypto/invoice",
-        "price_usd": 9.99,
+        "price_usd": settings.run_unlock_price_usd,
     }

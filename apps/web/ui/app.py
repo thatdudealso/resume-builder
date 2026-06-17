@@ -239,6 +239,7 @@ def index_page() -> None:
     paywall_dialog = ui.dialog()
     with paywall_dialog, ui.card().classes("gap-3").style("width: min(420px, 92vw);"):
         ui.label("Unlock full output").classes("text-lg font-medium")
+        paywall_price = ui.label("Unlock for $3.99").classes("text-base font-medium")
         ui.label(
             "The run is complete, but the tailored resume stays hidden until payment confirms."
         ).classes("rb-subtle")
@@ -263,7 +264,8 @@ def index_page() -> None:
         resumes = resumes_resp.json().get("resumes", []) if resumes_resp.status_code == 200 else []
         free_label = "used" if user.get("free_trial_used") else "available"
         upload_label = "yes" if user.get("can_upload") else "payment required"
-        price = billing.get("price_usd", "9.99")
+        price = billing.get("price_usd", 3.99)
+        paywall_price.set_text(f"Unlock for ${price}")
         status_label.set_text(
             f"Free trial: {free_label} · Upload: {upload_label} · Unlock: ${price}"
         )
