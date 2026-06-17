@@ -54,9 +54,12 @@ async def test_stripe_checkout_and_poll(client, monkeypatch):
         json={"run_id": run.json()["run_id"]},
     )
     assert checkout.status_code == 200
-    payment_id = checkout.json()["payment_id"]
-    poll = await client.get(f"/api/v1/billing/crypto/{payment_id}")
-    assert poll.status_code == 200
+    body = checkout.json()
+    assert body["checkout_url"]
+    assert body["payment_id"]
+    status = await client.get("/api/v1/billing/status")
+    assert status.status_code == 200
+    assert status.json()["price_usd"] == 3.99
 
 
 @pytest.mark.asyncio

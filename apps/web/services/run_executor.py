@@ -10,12 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apps.web.config import settings
 from packages.agent.checkpointer import get_checkpointer
 from packages.agent.graph import run_agent
+from packages.agent.schemas.providers import DEFAULT_PROVIDER
+from packages.agent.service import AgentService
 from packages.core.access.service import AccessService
 from packages.core.schemas.access import RunAccessMode
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.agent_run_event import AgentRunEvent
 from packages.db.models.resume import MasterResume
-from packages.integrations.hf_inference import complete as hf_complete
 
 _run_queues: dict[str, asyncio.Queue] = {}
 
@@ -47,28 +48,36 @@ async def execute_run(session: AsyncSession, run_id: UUID) -> None:
     output_locked = decision.mode == RunAccessMode.LOCKED
     is_free = decision.mode == RunAccessMode.FREE
 
+    provider_name = run.llm_provider or DEFAULT_PROVIDER.value
+    agent_service = AgentService(provider_name)
+
     initial = {
         "run_id": str(run_id),
         "user_id": str(run.user_id),
+        "llm_provider": provider_name,
         "master_resume_text": resume.raw_text,
         "jd_text": run.jd_text,
         "output_locked": output_locked,
         "retry_count": 0,
     }
 
-    async def llm_complete(*, model: str, prompt: str, node: str) -> str:
-        await queue.put({"event": "node_start", "node": node})
-        result = await hf_complete(model=model, prompt=prompt, node=node)
-        await queue.put({"event": "node_complete", "node": node})
-        return result
+    async def on_progress(item: dict) -> None:
+        await queue.put(item)
 
     try:
         async with get_checkpointer(settings.database_url) as checkpointer:
-            result = await run_agent(initial, llm_complete, checkpointer=checkpointer)
+            result = await run_agent(
+                initial,
+                agent_service,
+                on_progress=on_progress,
+                checkpointer=checkpointer,
+            )
         run.final_output = result.get("final_output")
         run.preview_text = (result.get("preview_text") or "")[:500]
-        run.ats_score_before = Decimal(str(result.get("ats_score_before", 0)))
-        run.ats_score_after = Decimal(str(result.get("ats_score_after", 0)))
+        match_before = (result.get("match_score_before") or {}).get("overall")
+        match_after = (result.get("match_score_after") or {}).get("overall")
+        run.ats_score_before = Decimal(str(match_before or result.get("ats_score_before", 0)))
+        run.ats_score_after = Decimal(str(match_after or result.get("ats_score_after", 0)))
         run.output_locked = output_locked
         run.is_free_trial_run = is_free
         run.status = "failed" if result.get("fatal_error") else "completed"
@@ -81,7 +90,12 @@ async def execute_run(session: AsyncSession, run_id: UUID) -> None:
                 run_id=run_id,
                 node_name="graph",
                 event_type="completed",
-                payload={"locked": output_locked},
+                payload={
+                    "locked": output_locked,
+                    "llm_provider": provider_name,
+                    "match_score_before": float(run.ats_score_before),
+                    "match_score_after": float(run.ats_score_after),
+                },
             )
         )
         await queue.put({"event": "done", "locked": output_locked})

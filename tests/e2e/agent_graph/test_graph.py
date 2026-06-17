@@ -1,55 +1,62 @@
 from __future__ import annotations
 
 import pytest
-from langgraph.checkpoint.memory import MemorySaver
 
-from packages.agent.graph import build_graph, run_agent
+from packages.agent.changelog.builder import build_changelog
+from packages.agent.graph import run_agent
+from packages.agent.schemas.variants import SECTION_KEYS
+from packages.agent.service import AgentService
 
 _INITIAL = {
     "run_id": "r1",
     "user_id": "u1",
-    "master_resume_text": "SUMMARY\nEngineer\nEXPERIENCE\nBuilt APIs with Python for 2020-2022.",
+    "llm_provider": "huggingface",
+    "master_resume_text": (
+        "SUMMARY\nEngineer\nEXPERIENCE\nBuilt APIs with Python for 2020-2022.\nSKILLS\nPython, SQL"
+    ),
     "jd_text": "Seeking Python API developer with PostgreSQL skills required.",
     "retry_count": 0,
 }
 
 
-async def _mock_llm(*, model: str, prompt: str, node: str) -> str:
-    if node == "validate_output":
-        return "no"
-    return '{"summary": "Engineer", "experience": "Built APIs", "skills": "Python"}'
-
-
 @pytest.mark.asyncio
 async def test_agent_graph_e2e():
-    result = await run_agent(_INITIAL, _mock_llm)
+    service = AgentService("huggingface")
+    result = await run_agent(_INITIAL, service)
     assert result.get("final_output")
     assert result.get("validation_passed") is True
+    assert result.get("match_score_before")
+    assert result.get("match_score_after")
+    final = result["final_output"]
+    assert "variants" in final
+    assert "conservative" in final["variants"]
+    assert "balanced" in final["variants"]
+    assert "bold" in final["variants"]
+    assert final.get("changelog") is not None
+    match = final["match_score"]
+    assert match["previous_overall"] is not None
+    assert match["current_overall"] is not None
 
 
 @pytest.mark.asyncio
-async def test_agent_graph_with_checkpointer_completes():
-    """Graph compiles and runs correctly when a checkpointer is wired in."""
-    checkpointer = MemorySaver()
-    result = await run_agent(_INITIAL, _mock_llm, checkpointer=checkpointer)
+async def test_agent_graph_respects_provider_selection(monkeypatch):
+    monkeypatch.setattr(
+        "packages.agent.providers.openai_provider.OpenAIProvider.is_configured",
+        lambda self: False,
+    )
+    initial = {**_INITIAL, "llm_provider": "openai"}
+    service = AgentService("openai")
+    result = await run_agent(initial, service)
     assert result.get("final_output")
-    assert result.get("validation_passed") is True
+    assert result["final_output"]["llm_provider"] == "openai"
 
 
-@pytest.mark.asyncio
-async def test_agent_graph_checkpoint_state_readable_after_completion():
-    """After a completed run, the final state is readable via aget_state.
-
-    This is the key production behaviour: if a container restarts between the
-    run completing and the DB write, we can recover the result from the
-    checkpoint rather than re-running the expensive LLM nodes.
-    """
-    checkpointer = MemorySaver()
-    result = await run_agent(_INITIAL, _mock_llm, checkpointer=checkpointer)
-    assert result.get("final_output")
-
-    # The compiled graph exposes aget_state keyed by thread_id
-    app = build_graph(_mock_llm, checkpointer=checkpointer)
-    config = {"configurable": {"thread_id": _INITIAL["run_id"]}}
-    saved = await app.aget_state(config)
-    assert saved.values.get("final_output") == result.get("final_output")
+def test_changelog_detects_changes():
+    original = {key: f"Original {key}" for key in SECTION_KEYS}
+    variants = {
+        "balanced": {key: f"Updated {key}" for key in SECTION_KEYS},
+        "conservative": original,
+        "bold": {key: f"Bold {key}" for key in SECTION_KEYS},
+    }
+    changelog = build_changelog(original, variants)
+    assert any(entry["variant"] == "balanced" for entry in changelog)

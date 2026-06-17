@@ -22,6 +22,9 @@ class AgentRun(Base):
         UUID(as_uuid=True), ForeignKey("master_resumes.id"), nullable=False
     )
     jd_text: Mapped[str] = mapped_column(Text, nullable=False)
+    llm_provider: Mapped[str] = mapped_column(
+        String(32), default="huggingface", server_default="huggingface"
+    )
     status: Mapped[str] = mapped_column(String(20), default="queued")
     is_free_trial_run: Mapped[bool] = mapped_column(Boolean, default=False)
     output_locked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)

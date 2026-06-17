@@ -172,7 +172,7 @@ async def test_billing_crypto_invoice_and_status(client, monkeypatch):
     await client.post(
         "/api/v1/auth/register",
         json={"email": "crypto@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
+        headers={"X-Device-Fingerprint": "crypto-invoice-fp"},
     )
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",

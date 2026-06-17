@@ -1,17 +1,29 @@
 from __future__ import annotations
 
 import re
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 class AgentState(TypedDict, total=False):
     run_id: str
     user_id: str
+    llm_provider: str
     master_resume_text: str
     master_resume_structured: dict[str, str]
     jd_text: str
     jd_keywords: list[str]
     keyword_gaps: list[str]
+    jd_analysis: dict[str, Any]
+    resume_analysis: dict[str, Any]
+    match_score_before: dict[str, Any]
+    match_score_after: dict[str, Any]
+    sections_missing: list[str]
+    variants: dict[str, dict[str, str]]
+    selected_variant: str
+    changelog: list[dict[str, str]]
+    sections_editable: dict[str, dict[str, object]]
+    user_section_overrides: dict[str, str]
+    user_added_sections: dict[str, str]
     ats_score_before: float
     ats_score_after: float
     section_drafts: dict[str, str]

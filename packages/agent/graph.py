@@ -5,16 +5,25 @@ from collections.abc import Awaitable, Callable
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
+from packages.agent.nodes.analyze_inputs import analyze_inputs
 from packages.agent.nodes.format_output import format_output
 from packages.agent.nodes.prepare_inputs import prepare_inputs
 from packages.agent.nodes.rewrite_sections import rewrite_sections
 from packages.agent.nodes.validate_output import validate_output
+from packages.agent.schemas.variants import DEFAULT_VARIANT
+from packages.agent.service import AgentService
 from packages.agent.state import AgentState
 
-LLMComplete = Callable[..., Awaitable[str]]
+ProgressCallback = Callable[[dict], Awaitable[None]]
 
 
 def _after_prepare(state: AgentState) -> str:
+    if state.get("fatal_error"):
+        return END
+    return "analyze_inputs"
+
+
+def _after_analyze(state: AgentState) -> str:
     if state.get("fatal_error"):
         return END
     return "rewrite_sections"
@@ -29,7 +38,8 @@ def _after_validate(state: AgentState) -> str:
 
 
 def build_graph(
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ):
     graph = StateGraph(AgentState)
@@ -37,16 +47,37 @@ def build_graph(
     async def prep_node(state: AgentState) -> AgentState:
         return prepare_inputs(state)
 
+    async def analyze_node(state: AgentState) -> AgentState:
+        return await analyze_inputs(state, agent_service, on_progress)
+
     async def rewrite_node(state: AgentState) -> AgentState:
-        return await rewrite_sections(state, llm_complete)
+        if on_progress:
+            await on_progress({"event": "node_start", "node": "rewrite_sections"})
+        selected_variant = state.get("selected_variant") or DEFAULT_VARIANT.value
+        seeded = {**state, "selected_variant": selected_variant}
+        result = await rewrite_sections(seeded, agent_service)
+        if on_progress:
+            await on_progress({"event": "node_complete", "node": "rewrite_sections"})
+        return result
 
     async def validate_node(state: AgentState) -> AgentState:
-        return await validate_output(state, llm_complete)
+        if on_progress:
+            await on_progress({"event": "node_start", "node": "validate_output"})
+        result = await validate_output(state, agent_service)
+        if on_progress:
+            await on_progress({"event": "node_complete", "node": "validate_output"})
+        return result
 
     async def format_node(state: AgentState) -> AgentState:
-        return format_output(state)
+        if on_progress:
+            await on_progress({"event": "node_start", "node": "format_output"})
+        result = format_output(state, agent_service)
+        if on_progress:
+            await on_progress({"event": "node_complete", "node": "format_output"})
+        return result
 
     graph.add_node("prepare_inputs", prep_node)
+    graph.add_node("analyze_inputs", analyze_node)
     graph.add_node("rewrite_sections", rewrite_node)
     graph.add_node("validate_output", validate_node)
     graph.add_node("format_output", format_node)
@@ -54,6 +85,11 @@ def build_graph(
     graph.add_conditional_edges(
         "prepare_inputs",
         _after_prepare,
+        {"analyze_inputs": "analyze_inputs", END: END},
+    )
+    graph.add_conditional_edges(
+        "analyze_inputs",
+        _after_analyze,
         {"rewrite_sections": "rewrite_sections", END: END},
     )
     graph.add_edge("rewrite_sections", "validate_output")
@@ -68,16 +104,12 @@ def build_graph(
 
 async def run_agent(
     initial: AgentState,
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> AgentState:
-    """Run the resume tailoring graph.
-
-    When a checkpointer is provided, the run is keyed by ``initial["run_id"]``
-    so the graph can resume from the last saved checkpoint if the container
-    restarts mid-run.
-    """
-    app = build_graph(llm_complete, checkpointer=checkpointer)
+    """Run the resume tailoring graph using the selected LLM provider."""
+    app = build_graph(agent_service, on_progress=on_progress, checkpointer=checkpointer)
     config = {"configurable": {"thread_id": initial["run_id"]}} if checkpointer else {}
     result = await app.ainvoke(initial, config)
     return result

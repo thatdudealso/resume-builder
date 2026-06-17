@@ -28,17 +28,24 @@ async def test_execute_run_completes(session, monkeypatch):
         user_id=user.id,
         master_resume_id=resume.id,
         jd_text="Python developer required " * 5,
+        llm_provider="huggingface",
         is_free_trial_run=True,
     )
     session.add(run)
     await session.commit()
 
-    async def fake_run_agent(initial, llm_complete, *, checkpointer=None):
+    async def fake_run_agent(initial, agent_service, *, on_progress=None, checkpointer=None):
         return {
-            "final_output": {"plain_text": "Tailored resume output."},
+            "final_output": {
+                "plain_text": "Tailored resume output.",
+                "variants": {"balanced": {"plain_text": "Tailored resume output."}},
+                "match_score": {"previous_overall": 40.0, "current_overall": 75.0},
+            },
             "preview_text": "Tailored resume output.",
-            "ats_score_before": 10.0,
-            "ats_score_after": 80.0,
+            "match_score_before": {"overall": 40.0},
+            "match_score_after": {"overall": 75.0},
+            "ats_score_before": 40.0,
+            "ats_score_after": 75.0,
             "validation_passed": True,
         }
 
@@ -53,3 +60,5 @@ async def test_execute_run_completes(session, monkeypatch):
     await execute_run(session, run.id)
     await session.refresh(run)
     assert run.status == "completed"
+    assert float(run.ats_score_before) == 40.0
+    assert float(run.ats_score_after) == 75.0
