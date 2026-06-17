@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from packages.agent.providers.registry import (
     get_provider,
     list_provider_options,
@@ -21,3 +23,8 @@ def test_get_provider_openai():
 
 def test_resolve_provider_defaults():
     assert resolve_provider_name(None) == DEFAULT_PROVIDER
+
+
+def test_get_provider_unknown():
+    with pytest.raises(ValueError, match="Unknown LLM provider"):
+        get_provider("not-a-provider")

@@ -18,7 +18,14 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("NOWPAYMENTS_API_KEY", "test")
 
 import packages.db.models  # noqa: F401
+import packages.integrations.hf_inference as hf_inference
 from packages.db.base import Base
+
+
+@pytest.fixture(autouse=True)
+def reset_hf_circuit_breaker() -> None:
+    hf_inference._circuit_open_until = 0.0
+    hf_inference._failure_count = 0
 
 
 @pytest.fixture(scope="session")
