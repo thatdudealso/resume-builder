@@ -33,6 +33,9 @@ async def upload_resume(
         text = extract_text_from_upload(filename, data)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    text = text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Resume file does not contain readable text.")
     key = f"resumes/{user.id}/{uuid.uuid4()}/{filename}"
     upload_bytes(key, data, file.content_type or "application/octet-stream")
     snap = await access.get_snapshot(user.id)

@@ -10,6 +10,13 @@ Dev-only file. **Never merge to `main`.**
 - Do not commit `.env`, secrets, `.agents/`, or dev-only docs to `main`.
 - Keep changes scoped to the selected feature and match existing project layout.
 
+## Current branch choice
+
+- As of 2026-06-17, PR #8 (`feature/faster-llm-models`) is clean/green and owns LLM provider/model defaults.
+- PR #7 (`feature/merge-input-analysis`) is unstable/failing and owns agent analysis internals.
+- Work selected: `feature/backend-resume-upload-validation`, because upload ingestion is a backend/frontend seam that avoids active agent code.
+- Branch-owned files: `packages/export/pdf_ingest.py`, `apps/web/api/v1/resumes.py`, upload validation tests, and this context update.
+
 ## Key paths
 
 - `apps/web/main.py` — FastAPI + NiceGUI entry

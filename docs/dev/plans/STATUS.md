@@ -51,6 +51,15 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | `feature/github-branch-protection` | Branch protection rules doc + optional `gh` setup script | Not started |
 | `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager per env | Not started |
 
+## Current open PR context (2026-06-17)
+
+| PR | Branch | Scope | Status | Collision note |
+|----|--------|-------|--------|----------------|
+| [#8](https://github.com/thatdudealso/resume-builder/pull/8) | `feature/faster-llm-models` | LLM provider/model defaults | Clean, green checks | Avoid provider/model defaults until merged |
+| [#7](https://github.com/thatdudealso/resume-builder/pull/7) | `feature/merge-input-analysis` | Merge resume/JD analysis into one LLM call | Unstable, failing `Feature PR` | Avoid agent analysis internals until fixed |
+
+Low-conflict backend/frontend work selected: `feature/backend-resume-upload-validation`, because it aligns upload ingestion with the existing DOCX-capable UI and avoids active agent/provider code.
+
 ## What was completed in the last session (2026-06-17)
 
 ### `feature/nicegui-paywall-polish` → PR #3 merged

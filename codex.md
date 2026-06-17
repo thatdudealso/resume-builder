@@ -13,6 +13,14 @@ Use it before changing code, opening PRs, or updating generated documentation.
 - Do not commit `.env`, secrets, `.agents/`, or `docs/dev/**` to `main`.
 - Keep implementation changes scoped to the selected feature branch.
 
+## Current Work Snapshot
+
+- As of 2026-06-17, open PR #8 (`feature/faster-llm-models`) is clean/green and owns LLM provider/model defaults.
+- Open PR #7 (`feature/merge-input-analysis`) is unstable/failing and owns agent analysis internals.
+- Current branch: `feature/backend-resume-upload-validation`.
+- This branch owns backend resume upload ingestion/validation and avoids agent/provider/model files.
+- Frontend already advertises DOCX uploads; this branch makes backend upload handling match that UI contract.
+
 ## Frontend Rules
 
 - Keep the NiceGUI app minimal, focused, and operational; do not build a marketing page.
