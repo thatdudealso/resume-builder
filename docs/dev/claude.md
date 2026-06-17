@@ -448,8 +448,8 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 
 | Branch | Scope | Status |
 |--------|-------|--------|
-| `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **PR open → develop** |
-| `feature/nicegui-paywall-polish` | Browser cookie auth, SSE UX, post-payment polling, device fingerprint JS | Not started |
+| `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **Merged PR #2** |
+| `feature/nicegui-paywall-polish` | Device fingerprint auth, single-page SSE UX, post-payment polling, export gating | **Merged PR #3** |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, `verify_docs` in CI | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
