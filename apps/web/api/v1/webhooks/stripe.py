@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.web.config import settings
 from apps.web.dependencies import get_db
 from packages.core.access.service import AccessService
 from packages.db.models.payment import Payment
@@ -59,7 +60,7 @@ async def stripe_webhook(request: Request, session: AsyncSession = Depends(get_d
                     provider="stripe",
                     provider_payment_id=event["data"]["object"]["id"],
                     idempotency_key=f"stripe-wh-{event['id']}",
-                    amount_usd=9.99,
+                    amount_usd=settings.run_unlock_price_usd,
                     status="pending",
                 )
                 session.add(payment)

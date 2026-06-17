@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     hf_token: str = ""
     anthropic_api_key: str = ""
     stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
     nowpayments_api_key: str = ""
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
     app_version: str = "dev"
     deployed_at: str = ""
     deploy_env: str = "local"
-    run_unlock_price_usd: float = 9.99
+    run_unlock_price_usd: float = 3.99
 
     @property
     def cors_origin_list(self) -> list[str]:
