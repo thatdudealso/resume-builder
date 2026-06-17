@@ -7,11 +7,11 @@ from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
 _TASK_MODELS: dict[AgentTask, str] = {
-    AgentTask.INPUT_ANALYSIS: "grok-2-1212",
-    AgentTask.JD_ANALYSIS: "grok-2-1212",
-    AgentTask.RESUME_ANALYSIS: "grok-2-1212",
-    AgentTask.SECTION_REWRITE: "grok-2-1212",
-    AgentTask.VALIDATION: "grok-2-1212",
+    AgentTask.INPUT_ANALYSIS: "grok-2-mini",
+    AgentTask.JD_ANALYSIS: "grok-2-mini",
+    AgentTask.RESUME_ANALYSIS: "grok-2-mini",
+    AgentTask.SECTION_REWRITE: "grok-2-mini",
+    AgentTask.VALIDATION: "grok-2-mini",
 }
 
 
