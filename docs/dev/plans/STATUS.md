@@ -1,6 +1,6 @@
 # Resume Builder — Implementation Status
 
-**Last updated:** 2026-06-16
+**Last updated:** 2026-06-17
 **Integration branch:** `develop`
 **Production branch:** `main` (promoted from `qa` only)
 
@@ -11,11 +11,11 @@
 | Monorepo scaffold | Done |
 | Auth + AccessService paywall | Done |
 | LangGraph 4-node agent | Done |
-| LangGraph Postgres checkpointer | **PR open** → `feature/langgraph-postgres-checkpointer` |
-| NiceGUI single-page app | Built on `feature/nicegui-paywall-polish`; PR pending |
+| LangGraph Postgres checkpointer | **Done** — merged PR #2 |
+| NiceGUI single-page app | **Done** — merged PR #3 |
 | Stripe + crypto payments | Done (webhooks + billing API) |
 | Exports TXT/DOCX/PDF | Done |
-| Test coverage gate | **85.94%** (94 tests) |
+| Test coverage gate | **≥85%** (107 tests after PR #3) |
 | CI workflows | Committed (Docker CI unverified locally) |
 | AWS deploy artifacts | Skeleton only |
 
@@ -27,8 +27,8 @@
 | scaffold-monorepo | pyproject, Docker Compose, packages | **Done** | merged to `develop` |
 | auth-access | JWT, migrations, AccessService | **Done** | |
 | langgraph-agent | 4-node graph, HF, SSE | **Done** | |
-| langgraph-checkpointer | AsyncPostgresSaver wired into graph + run_executor | **PR #2 open** | `feature/langgraph-postgres-checkpointer` → develop |
-| nicegui-ui | Single `/app/` page, device workspace, upload, SSE, paywall, post-payment polling, export gating | **Built** | `feature/nicegui-paywall-polish`; PR pending |
+| langgraph-checkpointer | AsyncPostgresSaver wired into graph + run_executor | **Done** | merged PR #2 |
+| nicegui-ui | Single `/app/` page, device workspace, upload, SSE, paywall, post-payment polling, export gating | **Done** | merged PR #3 |
 | payments | Stripe + NOWPayments | **Done** | |
 | exports-infra | Exports, S3, rate limit, headers | **Done** | |
 | testing-ci | 85% gate, GHA workflows | **Partial** | Docker verify → `feature/docker-ci-verify` |
@@ -43,15 +43,29 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 
 | Branch | Scope | Status |
 |--------|-------|--------|
-| `feature/langgraph-postgres-checkpointer` | `AsyncPostgresSaver` wired into `build_graph` / `run_agent` / `execute_run`; `get_checkpointer()` util; 6 new tests | **PR #2 open** |
-| `feature/nicegui-paywall-polish` | Single `/app/` workflow, no login/account UI, SSE UX, post-payment polling, device fingerprint JS | Built; browser smoke passed |
+| `feature/langgraph-postgres-checkpointer` | `AsyncPostgresSaver` wired into `build_graph` / `run_agent` / `execute_run`; `get_checkpointer()` util; 6 new tests | **Merged PR #2** |
+| `feature/nicegui-paywall-polish` | Single `/app/` workflow, device fingerprint auth, SSE UX, post-payment polling, export gating; 12 new tests | **Merged PR #3** |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql` export, ER diagram, `verify_docs` CI check | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + optional `gh` setup script | Not started |
 | `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager per env | Not started |
 
-## What was completed in the last session (2026-06-15)
+## What was completed in the last session (2026-06-17)
+
+### `feature/nicegui-paywall-polish` → PR #3 merged
+**Goal:** Production-quality NiceGUI UX — upload, tailor, pay, unlock, export in a single `/app/` page with no login/registration flow.
+
+**Files changed:**
+- `apps/web/dependencies.py` — `_request_fingerprint()` + `_get_or_create_device_user_id()` — device fingerprint creates/reuses an anonymous user keyed to `X-Device-Fingerprint` header
+- `apps/web/ui/auth_guard.py` — rewrote to use `request_contextvar`, sends fingerprint header on all API calls, removed `require_auth`
+- `apps/web/ui/app.py` — complete rewrite: single-page workflow, SSE progress, blur+paywall modal, post-Stripe-return polling, export gating
+- `packages/integrations/stripe_client.py` — success/cancel URLs now point to `/app/?` (was `/app/dashboard?`)
+- `tests/unit/apps/test_device_fingerprint.py` *(new)* — 12 tests for fingerprint extraction + device session upsert + auth paths
+
+**Coverage:** ≥85% (107 tests) · **PR:** [#3](https://github.com/thatdudealso/resume-builder/pull/3)
+
+## What was completed in the previous session (2026-06-16)
 
 ### `feature/langgraph-postgres-checkpointer`
 **Goal:** Resume agent runs survive container restarts — keyed by `run_id` as LangGraph `thread_id`.
