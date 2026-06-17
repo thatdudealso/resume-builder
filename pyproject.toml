@@ -141,6 +141,7 @@ module = [
     "apps.web.middleware.security_headers",
     "apps.web.ui.app",
     "apps.web.ui.auth_guard",
+    "apps.web.ui.dashboard",
     "apps.web.main",
     "apps.web.services.run_executor",
 ]
