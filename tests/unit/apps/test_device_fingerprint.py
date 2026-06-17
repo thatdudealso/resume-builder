@@ -14,7 +14,6 @@ from apps.web.dependencies import (
     get_current_user_id,
 )
 from packages.core.security.jwt import create_access_token, register_user
-from packages.db.models.user import User
 
 
 def _mock_request(
