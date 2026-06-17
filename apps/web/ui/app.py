@@ -192,7 +192,9 @@ def index_page() -> None:
         with ui.column().classes("rb-shell gap-5"):
             with ui.row().classes("rb-header items-center justify-between w-full"):
                 ui.label("Resume Builder").classes("rb-wordmark")
-                ui.label("One private device workspace.").classes("rb-subtle")
+                with ui.row().classes("items-center gap-3"):
+                    ui.link("Advanced dashboard", "/app/dashboard").classes("rb-subtle")
+                    ui.label("One private device workspace.").classes("rb-subtle")
 
             with ui.column().classes("gap-3"):
                 ui.label("Tailor your resume without inventing facts.").classes("rb-title")
@@ -481,4 +483,4 @@ def index_page() -> None:
 
 
 def mount_ui() -> None:
-    pass
+    from apps.web.ui import dashboard  # noqa: F401

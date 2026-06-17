@@ -169,10 +169,13 @@ async def test_run_stream_and_unlock(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_billing_crypto_invoice_and_status(client, monkeypatch):
+    import uuid
+
+    suffix = uuid.uuid4().hex[:8]
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "crypto@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "crypto-invoice-fp"},
+        json={"email": f"crypto-{suffix}@test.com", "password": "password123"},
+        headers={"X-Device-Fingerprint": f"crypto-invoice-{suffix}"},
     )
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
