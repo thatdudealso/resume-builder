@@ -35,6 +35,13 @@ async def test_resume_upload_errors(client, monkeypatch):
     )
     assert bad.status_code == 400
 
+    monkeypatch.setattr("apps.web.api.v1.resumes.extract_text_from_upload", lambda f, d: " ")
+    empty = await client.post(
+        "/api/v1/resumes",
+        files={"file": ("empty.txt", io.BytesIO(b" "), "text/plain")},
+    )
+    assert empty.status_code == 400
+
 
 @pytest.mark.asyncio
 async def test_run_invalid_resume(client):
