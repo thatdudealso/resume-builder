@@ -10,8 +10,6 @@ stripe.api_key = settings.stripe_secret_key
 
 
 def _line_item() -> dict:
-    if settings.stripe_price_id:
-        return {"price": settings.stripe_price_id, "quantity": 1}
     amount_cents = int(Decimal(str(settings.run_unlock_price_usd)) * 100)
     return {
         "price_data": {
