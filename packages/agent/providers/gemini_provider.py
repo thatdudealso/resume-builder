@@ -8,6 +8,7 @@ from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
 _TASK_MODELS: dict[AgentTask, str] = {
+    AgentTask.INPUT_ANALYSIS: "gemini-2.0-flash",
     AgentTask.JD_ANALYSIS: "gemini-2.0-flash",
     AgentTask.RESUME_ANALYSIS: "gemini-2.0-flash",
     AgentTask.SECTION_REWRITE: "gemini-2.0-flash",

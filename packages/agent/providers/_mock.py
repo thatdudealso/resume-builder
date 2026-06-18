@@ -6,6 +6,15 @@ from packages.agent.providers.base import AgentTask
 
 
 def mock_complete(task: AgentTask, prompt: str, *, json_mode: bool = False) -> str:
+    if task == AgentTask.INPUT_ANALYSIS:
+        jd_payload = mock_complete(AgentTask.JD_ANALYSIS, prompt, json_mode=True)
+        resume_payload = mock_complete(AgentTask.RESUME_ANALYSIS, prompt, json_mode=True)
+        return json.dumps(
+            {
+                "jd_analysis": json.loads(jd_payload),
+                "resume_analysis": json.loads(resume_payload),
+            }
+        )
     if task == AgentTask.JD_ANALYSIS:
         return json.dumps(
             {
