@@ -9,7 +9,7 @@ _TASK_MODELS: dict[AgentTask, str] = {
     AgentTask.INPUT_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.JD_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.RESUME_ANALYSIS: "meta-llama/Llama-3.1-8B-Instruct",
-    AgentTask.SECTION_REWRITE: "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+    AgentTask.SECTION_REWRITE: "meta-llama/Llama-3.1-8B-Instruct",
     AgentTask.VALIDATION: "meta-llama/Llama-3.1-8B-Instruct",
 }
 

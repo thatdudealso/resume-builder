@@ -11,7 +11,7 @@ _TASK_MODELS: dict[AgentTask, str] = {
     AgentTask.INPUT_ANALYSIS: "claude-3-5-haiku-20241022",
     AgentTask.JD_ANALYSIS: "claude-3-5-haiku-20241022",
     AgentTask.RESUME_ANALYSIS: "claude-3-5-haiku-20241022",
-    AgentTask.SECTION_REWRITE: "claude-3-5-sonnet-20241022",
+    AgentTask.SECTION_REWRITE: "claude-3-5-haiku-20241022",
     AgentTask.VALIDATION: "claude-3-5-haiku-20241022",
 }
 
