@@ -11,6 +11,12 @@ class VariantName(StrEnum):
 
 DEFAULT_VARIANT = VariantName.BALANCED
 
+VARIANT_LABELS: dict[VariantName, str] = {
+    VariantName.CONSERVATIVE: "Light touch",
+    VariantName.BALANCED: "Standard fit",
+    VariantName.BOLD: "Strong keyword match",
+}
+
 VARIANT_ORDER: tuple[VariantName, ...] = (
     VariantName.CONSERVATIVE,
     VariantName.BALANCED,
@@ -33,3 +39,7 @@ VARIANT_INSTRUCTIONS: dict[VariantName, str] = {
 }
 
 SECTION_KEYS: tuple[str, ...] = ("summary", "experience", "skills", "education")
+
+
+def variant_option_labels() -> dict[str, str]:
+    return {variant.value: VARIANT_LABELS[variant] for variant in VARIANT_ORDER}

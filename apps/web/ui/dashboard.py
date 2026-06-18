@@ -6,8 +6,7 @@ from typing import Any
 from nicegui import ui
 
 from apps.web.ui.auth_guard import api_client
-
-VARIANTS = ("conservative", "balanced", "bold")
+from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -112,6 +111,11 @@ def dashboard_page() -> None:
     upload_status = ui.label("")
 
     provider_select = ui.select(label="AI provider", options={}, value=None).classes("w-full")
+    variant_select = ui.select(
+        label="Tailoring style",
+        options=variant_option_labels(),
+        value=DEFAULT_VARIANT.value,
+    ).classes("w-full")
     upload = ui.upload(auto_upload=True).classes("w-full").props("accept=.pdf,.txt,.docx")
     jd_input = ui.textarea("Job description").classes("w-full").props("outlined autogrow")
 
@@ -127,9 +131,9 @@ def dashboard_page() -> None:
     variant_row = ui.row().classes("gap-2 hidden")
     variant_buttons: dict[str, Any] = {}
     with variant_row:
-        ui.label("Variant:").classes("self-center text-sm font-medium")
-        for name in VARIANTS:
-            variant_buttons[name] = ui.button(name.capitalize()).props("outline dense")
+        ui.label("Style:").classes("self-center text-sm font-medium")
+        for name, label in variant_option_labels().items():
+            variant_buttons[name] = ui.button(label).props("outline dense")
 
     missing_row = ui.column().classes("gap-2 hidden")
     changelog_panel = ui.expansion("What changed", icon="history").classes("w-full hidden")
@@ -397,6 +401,7 @@ def dashboard_page() -> None:
                     "resume_id": resumes[0]["resume_id"],
                     "jd_text": jd,
                     "llm_provider": provider_select.value or "huggingface",
+                    "variant": variant_select.value or DEFAULT_VARIANT.value,
                 },
             )
         if run_resp.status_code != 200:

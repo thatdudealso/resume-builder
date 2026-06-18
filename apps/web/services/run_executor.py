@@ -11,6 +11,7 @@ from apps.web.config import settings
 from packages.agent.checkpointer import get_checkpointer
 from packages.agent.graph import run_agent
 from packages.agent.schemas.providers import DEFAULT_PROVIDER
+from packages.agent.schemas.variants import DEFAULT_VARIANT
 from packages.agent.service import AgentService
 from packages.core.access.service import AccessService
 from packages.core.schemas.access import RunAccessMode
@@ -27,7 +28,12 @@ def get_run_queue(run_id: str) -> asyncio.Queue:
     return _run_queues[run_id]
 
 
-async def execute_run(session: AsyncSession, run_id: UUID) -> None:
+async def execute_run(
+    session: AsyncSession,
+    run_id: UUID,
+    *,
+    variant: str | None = None,
+) -> None:
     run = await session.get(AgentRun, run_id)
     if run is None:
         return
@@ -59,6 +65,7 @@ async def execute_run(session: AsyncSession, run_id: UUID) -> None:
         "jd_text": run.jd_text,
         "output_locked": output_locked,
         "retry_count": 0,
+        "selected_variant": variant or DEFAULT_VARIANT.value,
     }
 
     async def on_progress(item: dict) -> None:

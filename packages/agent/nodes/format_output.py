@@ -22,6 +22,8 @@ def format_output(state: AgentState, agent_service: AgentService | None = None) 
 
     variant_payload: dict[str, dict[str, object]] = {}
     for variant in VARIANT_ORDER:
+        if variant.value not in variants:
+            continue
         sections = dict(variants.get(variant.value, {}))
         for section, override in overrides.items():
             if override:

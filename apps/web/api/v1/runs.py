@@ -19,7 +19,7 @@ from apps.web.services.run_editor import (
 from apps.web.services.run_executor import execute_run, get_run_queue
 from packages.agent.providers.registry import get_provider, list_provider_options
 from packages.agent.schemas.providers import DEFAULT_PROVIDER, LLMProviderName
-from packages.agent.schemas.variants import SECTION_KEYS
+from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS, VariantName
 from packages.core.access.service import AccessService
 from packages.core.schemas.access import RunAccessMode
 from packages.core.security.sanitization import sanitize_text
@@ -34,6 +34,7 @@ class CreateRunRequest(BaseModel):
     resume_id: UUID
     jd_text: str = Field(min_length=20, max_length=50000)
     llm_provider: str = Field(default=DEFAULT_PROVIDER.value)
+    variant: str = Field(default=DEFAULT_VARIANT.value)
 
 
 class SelectVariantRequest(BaseModel):
@@ -96,6 +97,10 @@ async def create_run(
             status_code=400,
             detail=f"LLM provider '{provider_name.value}' is not configured",
         )
+    try:
+        variant_name = VariantName(body.variant)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid variant") from exc
     access = AccessService(session)
     decision = await access.can_start_run(user.id)
     if decision.mode == RunAccessMode.BLOCKED:
@@ -112,20 +117,21 @@ async def create_run(
     session.add(run)
     await session.commit()
     await session.refresh(run)
-    asyncio.create_task(_run_background(run.id))
+    asyncio.create_task(_run_background(run.id, variant_name.value))
     return {
         "run_id": str(run.id),
         "status": run.status,
         "output_locked": run.output_locked,
         "llm_provider": run.llm_provider,
+        "variant": variant_name.value,
     }
 
 
-async def _run_background(run_id: UUID) -> None:
+async def _run_background(run_id: UUID, variant: str | None = None) -> None:
     from packages.db.session import SessionLocal
 
     async with SessionLocal() as session:
-        await execute_run(session, run_id)
+        await execute_run(session, run_id, variant=variant)
 
 
 @router.get("/{run_id}")

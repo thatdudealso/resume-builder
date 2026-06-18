@@ -7,6 +7,7 @@ from nicegui import ui
 from nicegui.storage import request_contextvar
 
 from apps.web.ui.auth_guard import api_client
+from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -216,6 +217,11 @@ def index_page() -> None:
                 with ui.column().classes("rb-panel gap-4"):
                     ui.label("Inputs").classes("rb-section-title")
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
+                    variant_select = ui.select(
+                        label="Tailoring style",
+                        options=variant_option_labels(),
+                        value=DEFAULT_VARIANT.value,
+                    ).classes("w-full")
                     resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
                     upload_status = ui.label("").classes("text-sm")
                     upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
@@ -445,7 +451,11 @@ def index_page() -> None:
         async with api_client() as client:
             response = await client.post(
                 "/api/v1/runs",
-                json={"resume_id": resume_id, "jd_text": jd_text},
+                json={
+                    "resume_id": resume_id,
+                    "jd_text": jd_text,
+                    "variant": variant_select.value or DEFAULT_VARIANT.value,
+                },
             )
         if response.status_code != 200:
             run_button.props(remove="loading")

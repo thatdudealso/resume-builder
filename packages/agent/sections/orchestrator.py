@@ -6,6 +6,7 @@ from packages.agent.schemas.variants import (
     DEFAULT_VARIANT,
     SECTION_KEYS,
     VARIANT_ORDER,
+    VariantName,
 )
 from packages.agent.sections.agent import rewrite_section
 from packages.agent.service import AgentService
@@ -37,6 +38,14 @@ def _sections_to_tailor(
     return tailored
 
 
+def _variants_to_build(state: AgentState) -> tuple[VariantName, ...]:
+    selected = state.get("selected_variant") or DEFAULT_VARIANT.value
+    try:
+        return (VariantName(selected),)
+    except ValueError:
+        return (DEFAULT_VARIANT,)
+
+
 async def build_all_variants(
     state: AgentState, agent_service: AgentService
 ) -> dict[str, dict[str, str]]:
@@ -48,7 +57,7 @@ async def build_all_variants(
     to_tailor = _sections_to_tailor(sources, missing, user_added)
 
     variants: dict[str, dict[str, str]] = {}
-    for variant in VARIANT_ORDER:
+    for variant in _variants_to_build(state):
         if not to_tailor:
             variants[variant.value] = {}
             continue

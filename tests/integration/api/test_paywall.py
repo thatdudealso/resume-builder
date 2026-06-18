@@ -33,7 +33,7 @@ async def test_paywall_flow(client, monkeypatch):
     resume_id = upload.json()["resume_id"]
     jd = "Python API developer with PostgreSQL. " * 3
 
-    async def fast_run(run_id):
+    async def fast_run(run_id, variant=None):
         import packages.db.session as db_session
         from packages.core.access.service import AccessService
 

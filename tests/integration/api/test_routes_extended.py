@@ -103,7 +103,7 @@ async def test_export_download_redirect(client, monkeypatch):
     )
     resume_id = upload.json()["resume_id"]
 
-    async def bg(run_id):
+    async def bg(run_id, variant=None):
         import packages.db.session as db_session
         from packages.db.models.agent_run import AgentRun
 
