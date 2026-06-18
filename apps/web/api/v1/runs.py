@@ -164,12 +164,21 @@ async def stream_run(
     queue = get_run_queue(str(run_id))
 
     async def event_generator():
+        if run.status == "completed":
+            payload = {"locked": run.output_locked}
+            yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+            return
+        if run.status == "failed":
+            message = run.error_message or "Run failed"
+            yield f"event: error\ndata: {json.dumps({'message': message})}\n\n"
+            return
+
         while True:
             try:
-                item = await asyncio.wait_for(queue.get(), timeout=120.0)
+                item = await asyncio.wait_for(queue.get(), timeout=30.0)
             except TimeoutError:
                 yield "event: ping\ndata: {}\n\n"
-                break
+                continue
             if item.get("event") == "done":
                 payload = {"locked": item.get("locked", False)}
                 if can_view or not payload["locked"]:

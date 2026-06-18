@@ -7,14 +7,20 @@ from nicegui import ui
 from nicegui.storage import request_contextvar
 
 from apps.web.ui.auth_guard import api_client
+from apps.web.ui.run_progress import watch_run_progress
 from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
 
 STEPS = {
     "prepare_inputs": "Reading resume",
+    "analyze_inputs": "Analyzing job fit",
     "rewrite_sections": "Tailoring content",
     "validate_output": "Checking facts",
     "format_output": "Formatting result",
 }
+
+
+def _format_price(amount: float) -> str:
+    return f"${amount:.2f}"
 
 
 def _request() -> Any:
@@ -217,6 +223,11 @@ def index_page() -> None:
                 with ui.column().classes("rb-panel gap-4"):
                     ui.label("Inputs").classes("rb-section-title")
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
+                    provider_select = ui.select(
+                        label="AI model",
+                        options={},
+                        value=None,
+                    ).classes("w-full")
                     variant_select = ui.select(
                         label="Tailoring style",
                         options=variant_option_labels(),
@@ -247,7 +258,9 @@ def index_page() -> None:
     paywall_dialog = ui.dialog()
     with paywall_dialog, ui.card().classes("gap-3").style("width: min(420px, 92vw);"):
         ui.label("Unlock full output").classes("text-lg font-medium")
-        paywall_price = ui.label("Unlock for $3.99").classes("text-base font-medium")
+        paywall_price = ui.label(f"Unlock for {_format_price(3.99)}").classes(
+            "text-base font-medium"
+        )
         ui.label(
             "The run is complete, but the tailored resume stays hidden until payment confirms."
         ).classes("rb-subtle")
@@ -255,6 +268,21 @@ def index_page() -> None:
             stripe_button = ui.button("Stripe", icon="credit_card").props("unelevated")
             crypto_button = ui.button("Crypto", icon="currency_bitcoin").props("outline")
         crypto_status = ui.label("").classes("rb-subtle")
+
+    async def load_providers() -> None:
+        async with api_client() as client:
+            resp = await client.get("/api/v1/runs/providers")
+        if resp.status_code != 200:
+            provider_select.options = {"huggingface": "Hugging Face"}
+            provider_select.value = "huggingface"
+            return
+        providers = resp.json().get("providers", [])
+        options = {p["id"]: p["label"] for p in providers if p.get("configured")}
+        if not options:
+            options = {"huggingface": "Hugging Face"}
+        provider_select.options = options
+        default = next((p["id"] for p in providers if p.get("is_default")), "huggingface")
+        provider_select.value = default if default in options else next(iter(options))
 
     async def load_account() -> None:
         async with api_client() as client:
@@ -272,27 +300,36 @@ def index_page() -> None:
         resumes = resumes_resp.json().get("resumes", []) if resumes_resp.status_code == 200 else []
         free_label = "used" if user.get("free_trial_used") else "available"
         upload_label = "yes" if user.get("can_upload") else "payment required"
-        price = billing.get("price_usd", 3.99)
-        paywall_price.set_text(f"Unlock for ${price}")
+        price = float(billing.get("price_usd", 3.99))
+        paywall_price.set_text(f"Unlock for {_format_price(price)}")
         status_label.set_text(
-            f"Free trial: {free_label} · Upload: {upload_label} · Unlock: ${price}"
+            f"Free trial: {free_label} · Upload: {upload_label} · "
+            f"Unlock: {_format_price(price)}"
         )
         if resumes:
             resume_label.set_text(f"Resume: {resumes[0]['filename']}")
             state["resume_id"] = resumes[0]["resume_id"]
 
     async def handle_upload(event: Any) -> None:
+        upload_file = event.file
         upload_status.set_text("Uploading resume...")
         upload_status.classes(remove="rb-danger")
         upload_status.classes(add="rb-subtle")
+        try:
+            file_bytes = await upload_file.read()
+        except Exception as exc:
+            upload_status.set_text(f"Could not read upload: {exc}")
+            upload_status.classes(remove="rb-subtle")
+            upload_status.classes(add="rb-danger")
+            return
         async with api_client() as client:
             response = await client.post(
                 "/api/v1/resumes",
                 files={
                     "file": (
-                        event.name,
-                        event.content.read(),
-                        event.type or "application/octet-stream",
+                        upload_file.name,
+                        file_bytes,
+                        upload_file.content_type or "application/octet-stream",
                     )
                 },
             )
@@ -405,27 +442,12 @@ def index_page() -> None:
     stripe_button.on_click(pay_stripe)
     crypto_button.on_click(pay_crypto)
 
-    async def stream_progress(run_id: str) -> None:
-        current_event = ""
-        async with api_client() as client:
-            async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as stream:
-                async for line in stream.aiter_lines():
-                    if line.startswith("event: "):
-                        current_event = line.removeprefix("event: ")
-                    elif line.startswith("data: "):
-                        payload = json.loads(line.removeprefix("data: ") or "{}")
-                        if current_event == "progress":
-                            node = payload.get("node")
-                            verb = "Started" if payload.get("event") == "node_start" else "Done"
-                            progress_label.set_text(f"{verb}: {STEPS.get(node, node or 'step')}")
-                            progress.value = min(float(progress.value or 0) + 0.18, 0.9)
-                        elif current_event == "done":
-                            progress.value = 1
-                            progress_label.set_text("Run complete")
-                            return
-                        elif current_event == "error":
-                            progress_label.set_text(str(payload.get("message", "Run failed")))
-                            return
+    async def stream_progress(run_id: str) -> str:
+        def _update(label: str, value: float) -> None:
+            progress_label.set_text(label)
+            progress.value = value
+
+        return await watch_run_progress(run_id, steps=STEPS, on_update=_update)
 
     async def tailor() -> None:
         jd_text = (jd_input.value or "").strip()
@@ -454,6 +476,7 @@ def index_page() -> None:
                 json={
                     "resume_id": resume_id,
                     "jd_text": jd_text,
+                    "llm_provider": provider_select.value or "huggingface",
                     "variant": variant_select.value or DEFAULT_VARIANT.value,
                 },
             )
@@ -465,7 +488,10 @@ def index_page() -> None:
         data = response.json()
         state["run_id"] = data["run_id"]
         try:
-            await stream_progress(data["run_id"])
+            result = await stream_progress(data["run_id"])
+            if result == "error":
+                await refresh_run(show_paywall=False)
+                return
         finally:
             run_button.props(remove="loading")
         await refresh_run(show_paywall=True)
@@ -485,6 +511,7 @@ def index_page() -> None:
         else:
             payment_status.set_text("Waiting for payment confirmation...")
 
+    ui.timer(0.1, load_providers, once=True)
     ui.timer(0.1, load_account, once=True)
     ui.timer(0.1, lambda: ui.run_javascript("window.rbFingerprint.get();"), once=True)
     ui.timer(2.5, poll_after_payment)

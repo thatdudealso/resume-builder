@@ -6,6 +6,7 @@ from typing import Any
 from nicegui import ui
 
 from apps.web.ui.auth_guard import api_client
+from apps.web.ui.run_progress import watch_run_progress
 from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
 
 STEPS = {
@@ -15,6 +16,10 @@ STEPS = {
     "validate_output": "Checking facts",
     "format_output": "Formatting result",
 }
+
+
+def _format_price(amount: float) -> str:
+    return f"${amount:.2f}"
 
 
 def _format_detail(response_text: str, fallback: str) -> str:
@@ -110,7 +115,7 @@ def dashboard_page() -> None:
     status_label = ui.label("").classes("text-sm text-gray-600")
     upload_status = ui.label("")
 
-    provider_select = ui.select(label="AI provider", options={}, value=None).classes("w-full")
+    provider_select = ui.select(label="AI model", options={}, value=None).classes("w-full")
     variant_select = ui.select(
         label="Tailoring style",
         options=variant_option_labels(),
@@ -152,6 +157,9 @@ def dashboard_page() -> None:
     paywall = ui.column().classes("hidden gap-2")
     with paywall:
         ui.label("Unlock your tailored resume").classes("text-lg font-bold")
+        paywall_price = ui.label(f"Unlock for {_format_price(3.99)}").classes(
+            "text-base font-medium"
+        )
         stripe_btn = ui.button("Pay with Stripe")
         crypto_btn = ui.button("Pay with Crypto")
 
@@ -275,26 +283,37 @@ def dashboard_page() -> None:
             return
         data = resp.json()
         bill = billing.json() if billing.status_code == 200 else {}
+        price = float(bill.get("price_usd", 3.99))
+        paywall_price.set_text(f"Unlock for {_format_price(price)}")
         status_label.set_text(
             f"Free trial: {'used' if data.get('free_trial_used') else 'available'} | "
             f"Upload: {'yes' if data.get('can_upload') else 'pay required'} | "
-            f"Unlock: ${bill.get('price_usd', 3.99)}"
+            f"Unlock: {_format_price(price)}"
         )
 
     async def handle_upload(event: Any) -> None:
+        upload_file = event.file
+        upload_status.set_text("Uploading resume...")
+        try:
+            file_bytes = await upload_file.read()
+        except Exception as exc:
+            upload_status.set_text(f"Could not read upload: {exc}")
+            return
         async with api_client() as client:
             resp = await client.post(
                 "/api/v1/resumes",
                 files={
                     "file": (
-                        event.name,
-                        event.content.read(),
-                        event.type or "application/octet-stream",
+                        upload_file.name,
+                        file_bytes,
+                        upload_file.content_type or "application/octet-stream",
                     )
                 },
             )
         if resp.status_code == 200:
-            upload_status.set_text(f"Uploaded: {resp.json().get('filename')}")
+            data = resp.json()
+            state["resume_id"] = data["resume_id"]
+            upload_status.set_text(f"Uploaded: {data.get('filename')}")
         else:
             upload_status.set_text(_format_detail(resp.text, "Upload failed"))
 
@@ -351,27 +370,17 @@ def dashboard_page() -> None:
         state["selected_variant"] = name
         await refresh_run()
 
-    async def stream_progress(run_id: str) -> None:
-        current_event = ""
-        async with api_client() as client:
-            async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as stream:
-                async for line in stream.aiter_lines():
-                    if line.startswith("event: "):
-                        current_event = line.removeprefix("event: ")
-                    elif line.startswith("data: "):
-                        payload = json.loads(line.removeprefix("data: ") or "{}")
-                        if current_event == "progress":
-                            node = payload.get("node", "")
-                            verb = "Started" if payload.get("event") == "node_start" else "Done"
-                            progress_label.set_text(f"{verb}: {STEPS.get(node, node or 'step')}")
-                            progress.value = min(float(progress.value or 0) + 0.15, 0.92)
-                        elif current_event == "done":
-                            progress.value = 1
-                            progress_label.set_text("Complete")
-                            return
-                        elif current_event == "error":
-                            progress_label.set_text(str(payload.get("message", "Run failed")))
-                            return
+    async def stream_progress(run_id: str) -> str:
+        def _update(label: str, value: float) -> None:
+            progress_label.set_text(label)
+            progress.value = value
+
+        return await watch_run_progress(
+            run_id,
+            steps=STEPS,
+            on_update=_update,
+            step_increment=0.15,
+        )
 
     async def tailor() -> None:
         jd = (jd_input.value or "").strip()

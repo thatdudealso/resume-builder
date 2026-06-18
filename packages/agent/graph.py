@@ -45,7 +45,12 @@ def build_graph(
     graph = StateGraph(AgentState)
 
     async def prep_node(state: AgentState) -> AgentState:
-        return prepare_inputs(state)
+        if on_progress:
+            await on_progress({"event": "node_start", "node": "prepare_inputs"})
+        result = prepare_inputs(state)
+        if on_progress:
+            await on_progress({"event": "node_complete", "node": "prepare_inputs"})
+        return result
 
     async def analyze_node(state: AgentState) -> AgentState:
         return await analyze_inputs(state, agent_service, on_progress)
