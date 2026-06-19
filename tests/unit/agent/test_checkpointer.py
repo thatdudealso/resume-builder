@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import psycopg
 
 from packages.agent.checkpointer import (
     _to_psycopg_dsn,
@@ -43,6 +44,31 @@ async def test_get_checkpointer_does_not_call_setup():
             assert cp is mock_checkpointer
 
     mock_checkpointer.setup.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_current_schema_version_handles_missing_table():
+    mock_cursor = AsyncMock()
+    mock_cursor.execute = AsyncMock(
+        side_effect=psycopg.errors.UndefinedTable("relation does not exist")
+    )
+    mock_cursor.__aenter__ = AsyncMock(return_value=mock_cursor)
+    mock_cursor.__aexit__ = AsyncMock(return_value=False)
+
+    mock_conn = AsyncMock()
+    mock_conn.cursor = MagicMock(return_value=mock_cursor)
+    mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_conn.__aexit__ = AsyncMock(return_value=False)
+
+    with patch(
+        "packages.agent.checkpointer.psycopg.AsyncConnection.connect",
+        new=AsyncMock(return_value=mock_conn),
+    ):
+        from packages.agent.checkpointer import _current_schema_version
+
+        version = await _current_schema_version("postgresql://u:p@localhost/db")
+
+    assert version == -1
 
 
 @pytest.mark.asyncio

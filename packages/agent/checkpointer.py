@@ -26,7 +26,10 @@ def _to_psycopg_dsn(database_url: str) -> str:
 async def _current_schema_version(dsn: str) -> int:
     async with await psycopg.AsyncConnection.connect(dsn) as conn:
         async with conn.cursor() as cur:
-            await cur.execute("SELECT v FROM checkpoint_migrations ORDER BY v DESC LIMIT 1")
+            try:
+                await cur.execute("SELECT v FROM checkpoint_migrations ORDER BY v DESC LIMIT 1")
+            except psycopg.errors.UndefinedTable:
+                return -1
             row = await cur.fetchone()
             return int(row[0]) if row else -1
 
