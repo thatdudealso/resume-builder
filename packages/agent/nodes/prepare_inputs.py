@@ -20,7 +20,6 @@ def prepare_inputs(state: AgentState) -> AgentState:
         "jd_keywords": keywords,
         "keyword_gaps": gaps,
         "ats_score_before": before,
-        "section_drafts": dict(structured),
         "retry_count": state.get("retry_count", 0),
         "validation_errors": [],
         "validation_passed": False,

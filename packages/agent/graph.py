@@ -9,6 +9,7 @@ from packages.agent.nodes.analyze_inputs import analyze_inputs
 from packages.agent.nodes.format_output import format_output
 from packages.agent.nodes.prepare_inputs import prepare_inputs
 from packages.agent.nodes.rewrite_sections import rewrite_sections
+from packages.agent.nodes.understand_resume import understand_resume
 from packages.agent.nodes.validate_output import validate_output
 from packages.agent.schemas.variants import DEFAULT_VARIANT
 from packages.agent.service import AgentService
@@ -18,6 +19,12 @@ ProgressCallback = Callable[[dict], Awaitable[None]]
 
 
 def _after_prepare(state: AgentState) -> str:
+    if state.get("fatal_error"):
+        return END
+    return "understand_resume"
+
+
+def _after_understand(state: AgentState) -> str:
     if state.get("fatal_error"):
         return END
     return "analyze_inputs"
@@ -34,7 +41,7 @@ def _after_validate(state: AgentState) -> str:
         return "format_output"
     if state.get("retry_count", 0) < 2:
         return "rewrite_sections"
-    return END
+    return "format_output"
 
 
 def build_graph(
@@ -51,6 +58,9 @@ def build_graph(
         if on_progress:
             await on_progress({"event": "node_complete", "node": "prepare_inputs"})
         return result
+
+    async def understand_node(state: AgentState) -> AgentState:
+        return await understand_resume(state, agent_service, on_progress)
 
     async def analyze_node(state: AgentState) -> AgentState:
         return await analyze_inputs(state, agent_service, on_progress)
@@ -82,6 +92,7 @@ def build_graph(
         return result
 
     graph.add_node("prepare_inputs", prep_node)
+    graph.add_node("understand_resume", understand_node)
     graph.add_node("analyze_inputs", analyze_node)
     graph.add_node("rewrite_sections", rewrite_node)
     graph.add_node("validate_output", validate_node)
@@ -90,6 +101,11 @@ def build_graph(
     graph.add_conditional_edges(
         "prepare_inputs",
         _after_prepare,
+        {"understand_resume": "understand_resume", END: END},
+    )
+    graph.add_conditional_edges(
+        "understand_resume",
+        _after_understand,
         {"analyze_inputs": "analyze_inputs", END: END},
     )
     graph.add_conditional_edges(
@@ -101,7 +117,10 @@ def build_graph(
     graph.add_conditional_edges(
         "validate_output",
         _after_validate,
-        {"format_output": "format_output", "rewrite_sections": "rewrite_sections", END: END},
+        {
+            "format_output": "format_output",
+            "rewrite_sections": "rewrite_sections",
+        },
     )
     graph.add_edge("format_output", END)
     return graph.compile(checkpointer=checkpointer)

@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
+import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -11,11 +12,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.web.config import settings
 from apps.web.dependencies import get_current_user, get_db
+from apps.web.services.stripe_billing import sync_stripe_payment_for_run
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.payment import Payment
 from packages.db.models.user import User
 from packages.integrations.crypto.nowpayments import create_invoice
-from packages.integrations.stripe_client import create_checkout_session
+from packages.integrations.stripe_client import (
+    StripeNotConfiguredError,
+    create_checkout_session,
+    is_stripe_configured,
+)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -54,6 +60,7 @@ async def billing_status(
         ],
         "unlocked_runs": [str(r.id) for r in unlocked.scalars().all()],
         "price_usd": settings.run_unlock_price_usd,
+        "stripe_configured": is_stripe_configured(),
     }
 
 
@@ -76,9 +83,51 @@ async def stripe_checkout(
         status="pending",
     )
     session.add(payment)
+    await session.flush()
+    try:
+        checkout = create_checkout_session(
+            user_id=str(user.id),
+            run_id=str(run.id),
+            email=user.email,
+            resume_id=str(run.master_resume_id),
+        )
+    except StripeNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except stripe.error.StripeError as exc:
+        raise HTTPException(status_code=502, detail=f"Stripe error: {exc.user_message}") from exc
+    payment.provider_payment_id = checkout.session_id
     await session.commit()
-    url = create_checkout_session(user_id=str(user.id), run_id=str(run.id), email=user.email)
-    return {"checkout_url": url, "payment_id": str(payment.id)}
+    return {
+        "checkout_url": checkout.url,
+        "payment_id": str(payment.id),
+        "checkout_session_id": checkout.session_id,
+    }
+
+
+@router.post("/stripe/verify")
+async def stripe_verify(
+    body: StripeCheckoutRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    run = await session.get(AgentRun, body.run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if not is_stripe_configured():
+        raise HTTPException(status_code=503, detail="Stripe is not configured")
+    try:
+        unlocked = await sync_stripe_payment_for_run(
+            session,
+            user_id=user.id,
+            run_id=run.id,
+        )
+    except stripe.error.StripeError as exc:
+        raise HTTPException(status_code=502, detail=f"Stripe error: {exc.user_message}") from exc
+    run = await session.get(AgentRun, run.id)
+    return {
+        "unlocked": unlocked,
+        "output_locked": bool(run.output_locked) if run else True,
+    }
 
 
 @router.post("/crypto/invoice")

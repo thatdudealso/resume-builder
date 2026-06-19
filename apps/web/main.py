@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,10 +10,18 @@ from apps.web.api.router import api_router, health_router
 from apps.web.config import settings
 from apps.web.middleware.rate_limit import RateLimitMiddleware
 from apps.web.middleware.security_headers import SecurityHeadersMiddleware
+from packages.agent.checkpointer import ensure_checkpointer_schema
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.env not in ("test",):
+        await ensure_checkpointer_schema(settings.database_url)
     yield
 
 

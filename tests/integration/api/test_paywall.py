@@ -50,7 +50,7 @@ async def test_paywall_flow(client, monkeypatch):
                     await AccessService(bg_session).mark_free_trial_used(run.user_id)
                 await bg_session.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", fast_run)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", fast_run)
 
     run1 = await client.post(
         "/api/v1/runs",

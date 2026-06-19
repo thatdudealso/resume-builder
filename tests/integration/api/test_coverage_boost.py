@@ -59,7 +59,7 @@ async def test_export_locked_and_download(client, monkeypatch):
     async def noop_background(run_id, variant=None):
         return None
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", noop_background)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", noop_background)
     await client.post(
         "/api/v1/auth/register",
         json={"email": "dl@test.com", "password": "password123"},
@@ -150,7 +150,7 @@ async def test_run_stream_and_unlock(client, monkeypatch):
                 run.preview_text = "Preview content"
                 await s.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", bg)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", bg)
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},
@@ -244,7 +244,7 @@ async def test_run_get_with_final_output(client, monkeypatch):
                 run.final_output = {"plain_text": "Visible output"}
                 await s.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", bg)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", bg)
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},

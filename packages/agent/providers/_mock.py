@@ -6,6 +6,31 @@ from packages.agent.providers.base import AgentTask
 
 
 def mock_complete(task: AgentTask, prompt: str, *, json_mode: bool = False) -> str:
+    if task == AgentTask.RESUME_ORCHESTRATION:
+        return json.dumps(
+            {
+                "header": "Jane Doe\njane@example.com",
+                "sections": {
+                    "summary": "Experienced engineer.",
+                    "experience": "Built APIs with Python at Acme (2020-2022).",
+                    "skills": "Python, SQL",
+                },
+                "section_sources": {
+                    "summary": "OBJECTIVE",
+                    "experience": "EXPERIENCE",
+                    "skills": "SKILLS",
+                },
+                "sections_present": ["summary", "experience", "skills"],
+                "sections_suggested": [
+                    {
+                        "section": "education",
+                        "reason": "No education section found; add one if relevant.",
+                        "priority": "optional",
+                    }
+                ],
+                "understanding_notes": "Mock orchestrator mapping.",
+            }
+        )
     if task == AgentTask.INPUT_ANALYSIS:
         jd_payload = mock_complete(AgentTask.JD_ANALYSIS, prompt, json_mode=True)
         resume_payload = mock_complete(AgentTask.RESUME_ANALYSIS, prompt, json_mode=True)

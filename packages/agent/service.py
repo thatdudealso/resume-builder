@@ -40,7 +40,6 @@ class AgentService:
             "jd_analysis": jd_analysis.model_dump(),
             "resume_analysis": resume_analysis.model_dump(),
             "match_score_before": match_before.model_dump(),
-            "sections_missing": resume_analysis.sections_missing,
         }
 
     def score_match(
@@ -65,4 +64,5 @@ class AgentService:
             "id": self.provider_name.value,
             "rewrite_model": self.provider.model_for_task(AgentTask.SECTION_REWRITE),
             "analysis_model": self.provider.model_for_task(AgentTask.INPUT_ANALYSIS),
+            "orchestrator_model": self.provider.model_for_task(AgentTask.RESUME_ORCHESTRATION),
         }

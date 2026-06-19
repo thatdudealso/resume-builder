@@ -6,7 +6,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from starlette.responses import StreamingResponse
 
 from apps.web.config import settings
@@ -16,13 +18,12 @@ from apps.web.services.run_editor import (
     select_variant,
     update_section_override,
 )
-from apps.web.services.run_executor import execute_run, get_run_queue
-from packages.agent.providers.registry import get_provider, list_provider_options
-from packages.agent.schemas.providers import DEFAULT_PROVIDER, LLMProviderName
-from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS, VariantName
+from apps.web.services.run_executor import get_run_queue
+from apps.web.services.run_launcher import RunLaunchError, create_and_schedule_run
+from packages.agent.providers.registry import list_provider_options
+from packages.agent.schemas.providers import DEFAULT_PROVIDER
+from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS
 from packages.core.access.service import AccessService
-from packages.core.schemas.access import RunAccessMode
-from packages.core.security.sanitization import sanitize_text
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
@@ -57,6 +58,8 @@ def _serialize_run(run: AgentRun, can_view: bool) -> dict:
         "llm_provider": run.llm_provider,
         "output_locked": run.output_locked,
         "is_free_trial_run": run.is_free_trial_run,
+        "master_resume_id": str(run.master_resume_id),
+        "jd_text": run.jd_text,
         "ats_score_before": float(run.ats_score_before) if run.ats_score_before else None,
         "ats_score_after": float(run.ats_score_after) if run.ats_score_after else None,
         "match_score": {
@@ -66,6 +69,9 @@ def _serialize_run(run: AgentRun, can_view: bool) -> dict:
         "preview_text": run.preview_text,
         "created_at": run.created_at.isoformat() if run.created_at else None,
     }
+    resume = getattr(run, "resume", None)
+    if resume is not None:
+        payload["resume_filename"] = resume.filename
     if can_view and run.final_output:
         payload["final_output"] = run.final_output
     elif run.output_locked:
@@ -84,54 +90,17 @@ async def create_run(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    resume = await session.get(MasterResume, body.resume_id)
-    if resume is None or resume.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Resume not found")
     try:
-        provider_name = LLMProviderName(body.llm_provider)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid llm_provider") from exc
-    provider = get_provider(provider_name)
-    if not provider.is_configured():
-        raise HTTPException(
-            status_code=400,
-            detail=f"LLM provider '{provider_name.value}' is not configured",
+        return await create_and_schedule_run(
+            session,
+            user,
+            resume_id=body.resume_id,
+            jd_text=body.jd_text,
+            llm_provider=body.llm_provider,
+            variant=body.variant,
         )
-    try:
-        variant_name = VariantName(body.variant)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid variant") from exc
-    access = AccessService(session)
-    decision = await access.can_start_run(user.id)
-    if decision.mode == RunAccessMode.BLOCKED:
-        raise HTTPException(status_code=403, detail=decision.message)
-    jd = sanitize_text(body.jd_text)
-    run = AgentRun(
-        user_id=user.id,
-        master_resume_id=resume.id,
-        jd_text=jd,
-        llm_provider=provider_name.value,
-        output_locked=decision.mode == RunAccessMode.LOCKED,
-        is_free_trial_run=decision.mode == RunAccessMode.FREE,
-    )
-    session.add(run)
-    await session.commit()
-    await session.refresh(run)
-    asyncio.create_task(_run_background(run.id, variant_name.value))
-    return {
-        "run_id": str(run.id),
-        "status": run.status,
-        "output_locked": run.output_locked,
-        "llm_provider": run.llm_provider,
-        "variant": variant_name.value,
-    }
-
-
-async def _run_background(run_id: UUID, variant: str | None = None) -> None:
-    from packages.db.session import SessionLocal
-
-    async with SessionLocal() as session:
-        await execute_run(session, run_id, variant=variant)
+    except RunLaunchError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/{run_id}")
@@ -140,7 +109,11 @@ async def get_run(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    run = await session.get(AgentRun, run_id)
+    run = await session.get(
+        AgentRun,
+        run_id,
+        options=[selectinload(AgentRun.resume)],
+    )
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Run not found")
     access = AccessService(session)

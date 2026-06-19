@@ -35,7 +35,7 @@ async def test_locked_export_returns_402(client, monkeypatch):
                 run.final_output = {"plain_text": "secret"}
                 await s.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", bg)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", bg)
     await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python " * 10},

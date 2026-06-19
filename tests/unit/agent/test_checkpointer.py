@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from packages.agent.checkpointer import _to_psycopg_dsn, get_checkpointer
+from packages.agent.checkpointer import (
+    _to_psycopg_dsn,
+    ensure_checkpointer_schema,
+    get_checkpointer,
+)
 
 
 def test_to_psycopg_dsn_converts_asyncpg():
@@ -18,19 +22,36 @@ def test_to_psycopg_dsn_leaves_plain_url_unchanged():
 
 
 @pytest.mark.asyncio
-async def test_get_checkpointer_calls_setup():
+async def test_get_checkpointer_does_not_call_setup():
     mock_checkpointer = AsyncMock()
-    mock_checkpointer.setup = AsyncMock()
 
     mock_cm = MagicMock()
     mock_cm.__aenter__ = AsyncMock(return_value=mock_checkpointer)
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
-    with patch(
-        "packages.agent.checkpointer.AsyncPostgresSaver.from_conn_string",
-        return_value=mock_cm,
+    with (
+        patch(
+            "packages.agent.checkpointer.ensure_checkpointer_schema",
+            new=AsyncMock(),
+        ),
+        patch(
+            "packages.agent.checkpointer.AsyncPostgresSaver.from_conn_string",
+            return_value=mock_cm,
+        ),
     ):
         async with get_checkpointer("postgresql+asyncpg://u:p@localhost/db") as cp:
             assert cp is mock_checkpointer
 
-    mock_checkpointer.setup.assert_awaited_once()
+    mock_checkpointer.setup.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ensure_checkpointer_schema_applies_pending_migrations():
+    with patch(
+        "packages.agent.checkpointer._apply_pending_migrations",
+        new=AsyncMock(),
+    ) as mock_apply:
+        await ensure_checkpointer_schema("postgresql+asyncpg://u:p@localhost/db")
+        await ensure_checkpointer_schema("postgresql+asyncpg://u:p@localhost/db")
+
+    mock_apply.assert_awaited_once()

@@ -24,8 +24,8 @@ def _request_cookies() -> httpx.Cookies:
 def _request_fingerprint() -> str:
     request = request_contextvar.get()
     if request is None:
-        return "nicegui-client"
-    return request.cookies.get("rb_device_fingerprint", "nicegui-client")
+        return ""
+    return request.cookies.get("rb_device_fingerprint", "")
 
 
 @asynccontextmanager
