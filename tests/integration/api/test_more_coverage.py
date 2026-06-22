@@ -69,11 +69,7 @@ async def test_crypto_webhook_confirms_payment(client, session, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_export_docx_and_billing_poll(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "docx@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-docx"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

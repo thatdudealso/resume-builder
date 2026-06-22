@@ -7,11 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_locked_export_returns_402(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "locked@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-locked"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -55,11 +51,7 @@ async def test_locked_export_returns_402(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_crypto_invoice_endpoint(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "crypto2@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-crypto2"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

@@ -20,14 +20,17 @@ Use it before changing code, opening PRs, or updating generated documentation.
 - Current branch: `feature/backend-resume-upload-validation`.
 - This branch owns backend resume upload ingestion/validation and avoids agent/provider/model files.
 - Frontend already advertises DOCX uploads; this branch makes backend upload handling match that UI contract.
+- Current auth model: no credential login, registration, refresh, logout, password, or account
+  workflow is exposed by the app or API. `/api/v1/auth/me` is the only public auth route and
+  creates/reads a private device workspace from `X-Device-Fingerprint` / `rb_device_fingerprint`.
 
 ## Frontend Rules
 
 - Keep the NiceGUI app minimal, focused, and operational; do not build a marketing page.
 - Build one user-facing NiceGUI page at `/app/`. Do not add login,
   registration, dashboard, account, or other product pages.
-- Never add user-facing login, registration, logout, password, or account-creation
-  functionality. The frontend uses an automatic private device workspace.
+- Never add user-facing or API-facing login, registration, refresh, logout, password,
+  or account-creation functionality. The app uses an automatic private device workspace.
 - Keep upload, job-description input, streaming status, locked preview,
   paywall actions, payment return polling, and exports on that home page.
 - Use the backend API contracts in `apps/web/api/v1/**` instead of duplicating business logic.
@@ -41,6 +44,8 @@ Use it before changing code, opening PRs, or updating generated documentation.
 
 - Protected APIs create or reuse the private device workspace from
   `X-Device-Fingerprint` when no token is present.
+- `/api/v1/auth/me` is retained only for device workspace/account-state reads.
+  Do not add `/auth/register`, `/auth/login`, `/auth/refresh`, or `/auth/logout`.
 - Resume upload is `/api/v1/resumes`; only the first upload is free without confirmed payment.
 - Run creation is `/api/v1/runs`; progress streams from `/api/v1/runs/{run_id}/stream`.
 - Locked output is revealed only after `AccessService.unlock_run()` changes the run state.

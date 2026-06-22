@@ -25,11 +25,7 @@ def test_stripe_not_configured_for_fake_test_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_resume_upload_errors(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "err@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-err"
     big = await client.post(
         "/api/v1/resumes",
         files={"file": ("big.pdf", io.BytesIO(b"x" * (6 * 1024 * 1024)), "application/pdf")},
@@ -55,11 +51,7 @@ async def test_resume_upload_errors(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_invalid_resume(client):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "runerr@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-runerr"
     from uuid import uuid4
 
     resp = await client.post(
@@ -71,11 +63,7 @@ async def test_run_invalid_resume(client):
 
 @pytest.mark.asyncio
 async def test_export_invalid_format(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "badfmt@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-badfmt"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

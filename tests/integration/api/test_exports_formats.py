@@ -7,11 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_export_all_formats_unlocked(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "formats@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-formats"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

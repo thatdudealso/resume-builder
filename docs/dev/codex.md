@@ -16,6 +16,10 @@ Dev-only file. **Never merge to `main`.**
 - PR #7 (`feature/merge-input-analysis`) is unstable/failing and owns agent analysis internals.
 - Work selected: `feature/backend-resume-upload-validation`, because upload ingestion is a backend/frontend seam that avoids active agent code.
 - Branch-owned files: `packages/export/pdf_ingest.py`, `apps/web/api/v1/resumes.py`, upload validation tests, and this context update.
+- Current auth model: no credential login, registration, refresh, logout, password,
+  or account workflow is exposed by the app or API. `/api/v1/auth/me` is the only
+  public auth route and creates/reads a private device workspace from
+  `X-Device-Fingerprint` / `rb_device_fingerprint`.
 
 ## Key paths
 
@@ -33,9 +37,9 @@ Dev-only file. **Never merge to `main`.**
 - Keep the product screen simple and task-oriented; do not add a marketing landing page.
 - The NiceGUI frontend has one user-facing page at `/app/`. Do not add
   login, registration, dashboard, account, or other product pages.
-- Never add user-facing login, registration, logout, password, or account-creation
-  functionality. Upload, tailoring, paywall, payment return polling, and exports
-  all live on the home page.
+- Never add user-facing or API-facing login, registration, refresh, logout,
+  password, or account-creation functionality. Upload, tailoring, paywall,
+  payment return polling, and exports all live on the home page.
 - Set and reuse a stable `rb_device_fingerprint` cookie, then send it as
   `X-Device-Fingerprint` on API calls.
 - Use backend access flags as the source of truth. Do not reveal `final_output`
@@ -50,6 +54,7 @@ Dev-only file. **Never merge to `main`.**
 - Protected APIs create or reuse a private device workspace from
   `X-Device-Fingerprint` when no token is present.
 - `/api/v1/auth/me` returns free-trial and upload state for the current device workspace.
+  Do not add `/auth/register`, `/auth/login`, `/auth/refresh`, or `/auth/logout`.
 - `/api/v1/resumes` uploads and lists resumes scoped to the current user.
 - `/api/v1/runs` creates runs; `/api/v1/runs/{run_id}/stream` emits SSE progress.
 - `/api/v1/billing/stripe/checkout` and `/api/v1/billing/crypto/invoice` create payments.

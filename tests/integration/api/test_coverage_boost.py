@@ -14,42 +14,22 @@ from packages.db.models.resume import MasterResume
 
 
 @pytest.mark.asyncio
-async def test_auth_duplicate_register_and_me(client):
-    headers = {"X-Device-Fingerprint": "device-a", "User-Agent": "pytest"}
-    first = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "dup@test.com", "password": "password123"},
-        headers=headers,
-    )
-    assert first.status_code == 200
-    dup = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "dup@test.com", "password": "password123"},
-        headers=headers,
-    )
-    assert dup.status_code == 400
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "dup@test.com", "password": "password123"},
-        headers=headers,
-    )
-    assert login.status_code == 200
+async def test_device_workspace_me(client):
+    client.headers["X-Device-Fingerprint"] = "device-a"
+    client.headers["User-Agent"] = "pytest"
     me = await client.get("/api/v1/auth/me")
     assert me.status_code == 200
     body = me.json()
-    assert body["user"]["email"] == "dup@test.com"
+    assert body["user"]["email"].startswith("device-")
     assert "can_upload" in body
 
 
 @pytest.mark.asyncio
-async def test_auth_refresh_errors(client):
-    missing = await client.post("/api/v1/auth/refresh")
-    assert missing.status_code == 401
-    bad = await client.post(
-        "/api/v1/auth/refresh",
-        cookies={"refresh_token": "not-a-valid-token"},
-    )
-    assert bad.status_code == 401
+async def test_removed_credential_auth_routes(client):
+    assert (await client.post("/api/v1/auth/register")).status_code == 404
+    assert (await client.post("/api/v1/auth/login")).status_code == 404
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 404
+    assert (await client.post("/api/v1/auth/logout")).status_code == 404
 
 
 @pytest.mark.asyncio
@@ -60,11 +40,7 @@ async def test_export_locked_and_download(client, monkeypatch):
         return None
 
     monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", noop_background)
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "dl@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-dl"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -117,11 +93,7 @@ async def test_export_locked_and_download(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_stream_and_unlock(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "stream@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-stream"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -172,11 +144,7 @@ async def test_billing_crypto_invoice_and_status(client, monkeypatch):
     import uuid
 
     suffix = uuid.uuid4().hex[:8]
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": f"crypto-{suffix}@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": f"crypto-invoice-{suffix}"},
-    )
+    client.headers["X-Device-Fingerprint"] = f"crypto-invoice-{suffix}"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -216,11 +184,7 @@ async def test_billing_crypto_invoice_and_status(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_get_with_final_output(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "final@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-final"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

@@ -13,32 +13,17 @@ from packages.db.models.resume import MasterResume
 
 
 async def _auth(client, email: str):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = f"fp-{email}"
 
 
 @pytest.mark.asyncio
 async def test_auth_errors(client):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "dup@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
-    dup = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "dup@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
-    assert dup.status_code == 400
-    bad = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "dup@test.com", "password": "wrongpass"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
-    assert bad.status_code == 401
+    client.headers["X-Device-Fingerprint"] = "fp-auth-errors"
+    me = await client.get("/api/v1/auth/me")
+    assert me.status_code == 200
+    assert me.json()["user"]["email"].startswith("device-")
+    assert (await client.post("/api/v1/auth/register")).status_code == 404
+    assert (await client.post("/api/v1/auth/login")).status_code == 404
 
 
 @pytest.mark.asyncio
@@ -74,6 +59,11 @@ async def test_run_stream_progress(client, monkeypatch):
         files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},
     )
     resume_id = upload.json()["resume_id"]
+
+    async def noop_background(run_id, variant=None):
+        return None
+
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", noop_background)
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},

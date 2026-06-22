@@ -7,11 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_list_providers_endpoint(client):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "providers@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-providers"
     resp = await client.get("/api/v1/runs/providers")
     assert resp.status_code == 200
     providers = resp.json()["providers"]
@@ -20,11 +16,7 @@ async def test_list_providers_endpoint(client):
 
 @pytest.mark.asyncio
 async def test_create_run_rejects_invalid_provider(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "bad-provider@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-bad-provider"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -47,11 +39,7 @@ async def test_create_run_rejects_invalid_provider(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_create_run_rejects_unconfigured_openai(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "openai-off@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-openai-off"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -76,11 +64,7 @@ async def test_create_run_rejects_unconfigured_openai(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_create_run_rejects_invalid_variant(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "bad-variant@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-bad-variant"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -104,11 +88,7 @@ async def test_create_run_rejects_invalid_variant(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_create_run_returns_selected_variant(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "variant-create@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-variant-create"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -137,11 +117,7 @@ async def test_create_run_returns_selected_variant(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_patch_variant_when_unlocked(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "variant-ok@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-variant-ok"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",

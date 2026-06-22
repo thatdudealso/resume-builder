@@ -4,30 +4,24 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_register_login_me(client):
-    reg = await client.post(
-        "/api/v1/auth/register",
-        json={"email": "user@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "test-device"},
-    )
-    assert reg.status_code == 200
-    assert reg.cookies.get("access_token")
+async def test_device_workspace_me(client):
+    client.headers["X-Device-Fingerprint"] = "test-device"
     me = await client.get("/api/v1/auth/me")
     assert me.status_code == 200
-    assert me.json()["user"]["email"] == "user@test.com"
+    assert me.json()["user"]["email"].startswith("device-")
+    assert me.json()["can_upload"] is True
 
 
 @pytest.mark.asyncio
-async def test_refresh_and_logout(client):
-    await client.post(
+async def test_credential_routes_removed(client):
+    for path in (
         "/api/v1/auth/register",
-        json={"email": "refresh@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "dev"},
-    )
-    refresh = await client.post("/api/v1/auth/refresh")
-    assert refresh.status_code == 200
-    logout = await client.post("/api/v1/auth/logout")
-    assert logout.status_code == 200
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
+    ):
+        response = await client.post(path)
+        assert response.status_code == 404
 
 
 @pytest.mark.asyncio

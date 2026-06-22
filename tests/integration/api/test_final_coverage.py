@@ -9,31 +9,16 @@ from packages.integrations.stripe_client import StripeCheckoutResult
 
 
 @pytest.mark.asyncio
-async def test_login_and_refresh_flow(client):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "flow@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "device-1", "User-Agent": "pytest"},
-    )
-    login = await client.post(
-        "/api/v1/auth/login",
-        json={"email": "flow@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "device-1"},
-    )
-    assert login.status_code == 200
-    refresh = await client.post("/api/v1/auth/refresh")
-    assert refresh.status_code == 200
-    logout = await client.post("/api/v1/auth/logout")
-    assert logout.status_code == 200
+async def test_credential_auth_routes_are_removed(client):
+    assert (await client.post("/api/v1/auth/register")).status_code == 404
+    assert (await client.post("/api/v1/auth/login")).status_code == 404
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 404
+    assert (await client.post("/api/v1/auth/logout")).status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_stripe_checkout_and_poll(client, monkeypatch):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "stripe3@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-stripe3"
     monkeypatch.setattr(
         "apps.web.api.v1.resumes.extract_text_from_upload",
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
@@ -69,11 +54,7 @@ async def test_stripe_checkout_and_poll(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_not_found(client):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "nf@test.com", "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = "fp-nf"
     missing = await client.get(f"/api/v1/runs/{uuid4()}")
     assert missing.status_code == 404
 

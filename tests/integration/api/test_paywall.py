@@ -6,11 +6,7 @@ import pytest
 
 
 async def _register_and_login(client, email: str):
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": "password123"},
-        headers={"X-Device-Fingerprint": "fp"},
-    )
+    client.headers["X-Device-Fingerprint"] = f"fp-{email}"
 
 
 @pytest.mark.asyncio

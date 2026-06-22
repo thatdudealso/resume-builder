@@ -13,8 +13,6 @@ from apps.web.dependencies import get_redis
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     LIMITS = {
-        "auth_register": (3, 86400),
-        "auth_login": (10, 3600),
         "agent_run_create": (5, 3600),
         "billing_checkout": (10, 3600),
         "webhook": (1000, 60),
@@ -23,10 +21,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _endpoint_class(self, request: Request) -> str:
         path = request.url.path
-        if path.endswith("/auth/register"):
-            return "auth_register"
-        if path.endswith("/auth/login"):
-            return "auth_login"
         if path.endswith("/runs") and request.method == "POST":
             return "agent_run_create"
         if request.method == "POST" and (
