@@ -73,6 +73,9 @@ async def test_current_schema_version_handles_missing_table():
 
 @pytest.mark.asyncio
 async def test_ensure_checkpointer_schema_applies_pending_migrations():
+    import packages.agent.checkpointer as checkpointer_module
+
+    checkpointer_module._schema_ready = False
     with patch(
         "packages.agent.checkpointer._apply_pending_migrations",
         new=AsyncMock(),
@@ -81,3 +84,4 @@ async def test_ensure_checkpointer_schema_applies_pending_migrations():
         await ensure_checkpointer_schema("postgresql+asyncpg://u:p@localhost/db")
 
     mock_apply.assert_awaited_once()
+    checkpointer_module._schema_ready = False
