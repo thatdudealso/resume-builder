@@ -35,7 +35,7 @@ async def create_run_record(
     jd_text: str,
     llm_provider: str,
     variant: str,
-) -> dict:
+) -> dict[str, object]:
     logger.info(
         "create_run_record user=%s resume=%s provider=%s variant=%s jd_chars=%s",
         user.id,
@@ -110,7 +110,7 @@ async def create_and_schedule_run(
     jd_text: str,
     llm_provider: str,
     variant: str,
-) -> dict:
+) -> dict[str, object]:
     result = await create_run_record(
         session,
         user,
@@ -119,5 +119,7 @@ async def create_and_schedule_run(
         llm_provider=llm_provider,
         variant=variant,
     )
-    asyncio.create_task(execute_run_background(UUID(result["run_id"]), result["variant"]))
+    asyncio.create_task(
+        execute_run_background(UUID(str(result["run_id"])), str(result["variant"]))
+    )
     return result

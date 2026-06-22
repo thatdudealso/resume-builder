@@ -119,7 +119,10 @@ def test_format_output_includes_header_and_suggestions():
     state = format_output(
         {
             "section_drafts": {"summary": "Engineer"},
-            "master_resume_structured": {"header": "Jane Doe\njane@example.com", "summary": "Engineer"},
+            "master_resume_structured": {
+                "header": "Jane Doe\njane@example.com",
+                "summary": "Engineer",
+            },
             "variants": {"balanced": {"summary": "Tailored engineer"}},
             "selected_variant": "balanced",
             "sections_suggested": [

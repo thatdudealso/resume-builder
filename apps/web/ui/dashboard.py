@@ -20,7 +20,6 @@ from apps.web.ui.run_progress import watch_run_progress
 from apps.web.ui.workflow_session import (
     WORKFLOW_SESSION_SCRIPT,
     apply_run_context,
-    ensure_device_fingerprint,
     save_browser_workflow,
 )
 from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels

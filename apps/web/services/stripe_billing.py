@@ -83,7 +83,10 @@ def _session_metadata(stripe_session: object) -> dict[str, str]:
     if hasattr(raw, "to_dict"):
         data = raw.to_dict()
         return {str(k): str(v) for k, v in data.items()}
-    return {str(k): str(raw[k]) for k in raw.keys()}  # type: ignore[union-attr]
+    keys = getattr(raw, "keys", None)
+    if keys is None:
+        return {}
+    return {str(k): str(raw[k]) for k in keys()}
 
 
 def _stripe_session_paid(stripe_session: object) -> bool:

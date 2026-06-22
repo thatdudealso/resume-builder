@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
 
 from packages.agent.nodes.understand_resume import understand_resume
@@ -12,7 +10,6 @@ from packages.agent.providers.openai_provider import OpenAIProvider
 from packages.agent.schemas.variants import SECTION_KEYS
 from packages.agent.service import AgentService
 from packages.agent.state import split_sections
-
 
 RESUME_SAMPLE = (
     "Ashish Gare\n"

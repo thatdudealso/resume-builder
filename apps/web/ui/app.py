@@ -327,7 +327,9 @@ def index_page() -> None:
         state["stripe_configured"] = billing.get("stripe_configured", False)
         if not state["stripe_configured"]:
             stripe_button.props("disable")
-            crypto_status.set_text("Stripe is not configured on this server (set STRIPE_SECRET_KEY).")
+            crypto_status.set_text(
+                "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+            )
         else:
             stripe_button.props(remove="disable")
             if not state.get("poll_payment"):

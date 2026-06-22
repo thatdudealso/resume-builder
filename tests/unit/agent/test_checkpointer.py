@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import psycopg
+import pytest
 
 from packages.agent.checkpointer import (
     _to_psycopg_dsn,

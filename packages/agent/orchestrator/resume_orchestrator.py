@@ -74,7 +74,7 @@ def _fallback_structure(resume_text: str) -> ResumeStructure:
     )
 
 
-def _normalize_structure(data: dict, resume_text: str) -> ResumeStructure:
+def _normalize_structure(data: dict[str, object], resume_text: str) -> ResumeStructure:
     structure = ResumeStructure.model_validate(data)
     sections: dict[str, str] = {}
     sources: dict[str, str] = dict(structure.section_sources)

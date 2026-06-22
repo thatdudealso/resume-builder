@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.web.services.run_launcher import RunLaunchError, create_and_schedule_run, create_run_record
+from apps.web.services.run_launcher import (
+    RunLaunchError,
+    create_and_schedule_run,
+    create_run_record,
+)
 from packages.core.security.jwt import register_user
 from packages.db.models.resume import MasterResume
 

@@ -31,7 +31,11 @@ async def watch_run_progress(
         try:
             item = await asyncio.wait_for(queue.get(), timeout=30.0)
         except TimeoutError:
-            logger.warning("watch_run_progress timeout run_id=%s progress=%.2f", run_id, progress_value)
+            logger.warning(
+                "watch_run_progress timeout run_id=%s progress=%.2f",
+                run_id,
+                progress_value,
+            )
             on_update(
                 "Still working… LLM steps can take several minutes",
                 progress_value,
