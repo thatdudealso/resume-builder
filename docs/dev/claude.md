@@ -7,10 +7,10 @@
 
 ## 1. What This App Does
 
-Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/TXT), pastes a job description, and gets a rewritten resume with job-description keywords injected — no hallucinated facts.
+Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, and gets a rewritten resume with job-description keywords injected — no hallucinated facts. The user can also pick a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok/HuggingFace) before running.
 
 **Free trial:** 1 resume upload + 1 JD run → full visible output.
-**All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$9.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
+**All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$3.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
 
 ---
 
@@ -39,21 +39,53 @@ resume-builder/
 │       │           ├── stripe.py    # POST /webhooks/stripe
 │       │           └── crypto.py    # POST /webhooks/crypto
 │       ├── services/
-│       │   └── run_executor.py      # Background task: runs the LangGraph agent
+│       │   ├── run_executor.py      # execute_run_background() — runs the LangGraph agent
+│       │   ├── run_launcher.py      # create_and_schedule_run() — creates run + schedules execution as a task
+│       │   ├── run_editor.py        # post-run section edits/retailor, used by PATCH /runs/{id}/sections/*
+│       │   └── stripe_billing.py    # checkout session creation + /billing/stripe/verify polling fallback
 │       └── ui/
-│           ├── app.py               # NiceGUI pages (mounted at /app)
-│           └── auth_guard.py        # NiceGUI session/cookie check
+│           ├── app.py               # NiceGUI home page at /app/ — primary upload+tailor+pay workflow
+│           ├── dashboard.py         # NiceGUI page at /app/dashboard — advanced/duplicate workflow with score cards
+│           ├── auth_guard.py        # NiceGUI session/cookie check
+│           ├── request_auth.py      # device-fingerprint-based request auth for UI → API calls
+│           ├── run_progress.py      # SSE-style progress watcher used by both app.py and dashboard.py
+│           ├── workflow_session.py  # persists run/resume/JD state in browser storage across Stripe redirect
+│           └── console_log.py       # browser console logging helper
 │
 ├── packages/
 │   ├── agent/
 │   │   ├── state.py                 # AgentState TypedDict + helper functions
-│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring
+│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring (6 nodes)
+│   │   ├── service.py               # AgentService — wraps the selected LLMProvider for all nodes
 │   │   ├── checkpointer.py          # get_checkpointer() — AsyncPostgresSaver context mgr
-│   │   └── nodes/
-│   │       ├── prepare_inputs.py    # Node 1: parse PDF, extract keywords, ATS score
-│   │       ├── rewrite_sections.py  # Node 2: HF LLM rewrite (primary call)
-│   │       ├── validate_output.py   # Node 3: HF LLM hallucination check (secondary call)
-│   │       └── format_output.py     # Node 4: build final_output dict + plain text
+│   │   ├── nodes/
+│   │   │   ├── prepare_inputs.py    # Node 1: parse resume, extract keywords, ATS score (no LLM)
+│   │   │   ├── understand_resume.py # Node 2: LLM — structure resume into sections
+│   │   │   ├── analyze_inputs.py    # Node 3: LLM — combined JD+resume analysis (1 call, was 2)
+│   │   │   ├── rewrite_sections.py  # Node 4: LLM — rewrite for the selected tailoring variant
+│   │   │   ├── validate_output.py   # Node 5: LLM — hallucination check
+│   │   │   └── format_output.py     # Node 6: build final_output dict + plain text (no LLM)
+│   │   ├── analysts/
+│   │   │   ├── input_analyst.py     # analyze_inputs_combined() — single-call JD+resume analysis
+│   │   │   ├── jd_analyst.py        # legacy sequential JD analysis (fallback path)
+│   │   │   └── resume_analyst.py    # legacy sequential resume analysis (fallback path)
+│   │   ├── orchestrator/
+│   │   │   └── resume_orchestrator.py  # understand_resume_structure() for the understand_resume node
+│   │   ├── sections/
+│   │   │   ├── agent.py             # rewrite_section() — per-section LLM call with variant instructions
+│   │   │   └── orchestrator.py      # build_all_variants() — builds 1 (default) or 3 (retailor) variants
+│   │   ├── providers/
+│   │   │   ├── base.py              # LLMProvider protocol
+│   │   │   ├── registry.py          # get_provider(), list_provider_options()
+│   │   │   ├── openai_provider.py / anthropic_provider.py / gemini_provider.py / grok_provider.py / huggingface_provider.py
+│   │   │   └── _http.py, _mock.py   # shared HTTP client + test mock provider
+│   │   ├── schemas/
+│   │   │   ├── variants.py          # VariantName enum (conservative/balanced/bold) + instructions
+│   │   │   ├── providers.py         # LLMProviderName enum + labels
+│   │   │   ├── analysis.py / match.py / resume_structure.py
+│   │   ├── scoring/match_score.py   # ATS-style match scoring (no LLM)
+│   │   ├── changelog/builder.py     # human-readable per-run changelog
+│   │   └── utils/json_parse.py      # tolerant JSON parsing of LLM output
 │   │
 │   ├── core/
 │   │   ├── access/
@@ -180,11 +212,20 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 |-----|------|-------------|
 | `run_id` | `str` | caller — stringified UUID |
 | `user_id` | `str` | caller — stringified UUID |
+| `llm_provider` | `str` | caller — selected `LLMProviderName` |
 | `master_resume_text` | `str` | caller |
-| `master_resume_structured` | `dict` | `prepare_inputs` |
+| `master_resume_structured` | `dict[str, str]` | `prepare_inputs` |
 | `jd_text` | `str` | caller |
 | `jd_keywords` | `list[str]` | `prepare_inputs` |
 | `keyword_gaps` | `list[str]` | `prepare_inputs` |
+| `jd_analysis` / `resume_analysis` | `dict` | `analyze_inputs` (single combined LLM call) |
+| `match_score_before` / `match_score_after` | `dict` | `scoring/match_score.py` |
+| `resume_structure` | `dict` | `understand_resume` |
+| `sections_to_tailor` / `sections_suggested` / `sections_missing` | `list` | `understand_resume` |
+| `selected_variant` | `str` | caller (defaults to `DEFAULT_VARIANT` if unset) |
+| `variants` | `dict[str, dict[str, str]]` | `rewrite_sections` — keyed by variant name |
+| `changelog` | `list[dict[str, str]]` | `changelog/builder.py` |
+| `sections_editable` / `user_section_overrides` / `user_added_sections` | `dict` | post-run edits via `run_editor.py` |
 | `ats_score_before` | `float` | `prepare_inputs` |
 | `ats_score_after` | `float` | `format_output` |
 | `section_drafts` | `dict[str, str]` | `rewrite_sections` |
@@ -192,6 +233,7 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 | `validation_passed` | `bool` | `validate_output` |
 | `retry_count` | `int` | caller init `0`; graph increments |
 | `final_output` | `dict` | `format_output` |
+| `preview_text` | `str` | `format_output` |
 | `output_locked` | `bool` | caller (from `AccessService` decision) |
 | `cancelled` | `bool` | set externally to abort in-flight run |
 | `fatal_error` | `str` | `prepare_inputs` on unrecoverable failure |
@@ -199,8 +241,10 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 ### API route naming
 - Collection: `GET /resumes`, `POST /resumes`
 - Instance: `GET /runs/{run_id}`, `DELETE /runs/{run_id}`
-- Sub-resource action: `POST /runs/{run_id}/unlock`
+- Sub-resource action: `POST /runs/{run_id}/unlock`, `PATCH /runs/{run_id}/variant`, `PATCH /runs/{run_id}/sections/{section_name}`, `POST /runs/{run_id}/sections/{section_name}/add`
+- Provider listing: `GET /runs/providers`
 - SSE endpoint: `GET /runs/{run_id}/stream`
+- Payment-return fallback: `POST /billing/stripe/verify` — polls Stripe directly when the webhook is delayed
 - Namespaced billing: `POST /billing/stripe/checkout`, `POST /billing/crypto/invoice`
 - Webhooks: `POST /webhooks/stripe`, `POST /webhooks/crypto`
 
@@ -213,17 +257,22 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 | `JWT_SECRET` | 32+ random chars | |
 | `JWT_ACCESS_EXPIRE_MINUTES` | `15` | |
 | `JWT_REFRESH_EXPIRE_DAYS` | `7` | |
-| `HF_TOKEN` | `hf_...` | HF Inference API |
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | Claude fallback |
+| `HF_TOKEN` | `hf_...` | HuggingFace Inference API provider |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Anthropic provider |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` | `sk-...` | OpenAI provider (default provider) |
+| `GEMINI_API_KEY` | | Gemini provider |
+| `XAI_API_KEY` / `XAI_BASE_URL` | | Grok provider |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | |
+| `STRIPE_PUBLISHABLE_KEY` | `pk_live_...` | Used by NiceGUI Checkout redirect |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Signature verification |
-| `STRIPE_PRICE_ID` | `price_...` | One-time $9.99 |
+| `STRIPE_PRICE_ID` | `price_...` | One-time $3.99 |
 | `NOWPAYMENTS_API_KEY` | | |
 | `NOWPAYMENTS_IPN_SECRET` | | HMAC secret |
 | `S3_ENDPOINT` | `http://minio:9000` | Empty = AWS S3 |
 | `S3_BUCKET` | `resume-builder` | |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | | |
-| `RUN_UNLOCK_PRICE_USD` | `9.99` | |
+| `RUN_UNLOCK_PRICE_USD` | `3.99` | |
+| `APP_VERSION` / `DEPLOYED_AT` / `DEPLOY_ENV` | | Surfaced via `/api/v1/deployments/latest` |
 
 ---
 
@@ -291,10 +340,13 @@ Container restarts → execute_run() called again for same run_id
 
 ```python
 class AccessService:
+    async def get_user(user_id: UUID) -> User | None
+    async def has_confirmed_payment(user_id: UUID) -> bool
+    async def get_snapshot(user_id: UUID) -> AccessSnapshot
     async def can_upload_resume(user_id: UUID) -> bool
     async def can_start_run(user_id: UUID) -> RunAccessDecision   # .mode: FREE|LOCKED|BLOCKED
-    async def can_view_output(user_id: UUID, run_id: UUID) -> bool
-    async def can_export(user_id: UUID, run_id: UUID) -> bool
+    async def can_view_output(user_id: UUID, run: AgentRun) -> bool   # takes the loaded run, not just its id
+    async def can_export(user_id: UUID, run: AgentRun) -> bool
     async def unlock_run(payment_id: UUID, run_id: UUID) -> None
     async def mark_free_trial_used(user_id: UUID) -> None
 ```
@@ -320,42 +372,42 @@ class AccessService:
 
 ---
 
-## 6. LangGraph Agent — 4 Nodes Only
+## 6. LangGraph Agent — 6 Nodes
 
 `packages/agent/graph.py`
 
 ```
-prepare_inputs ──→ rewrite_sections ──→ validate_output ──→ format_output ──→ END
-      │                                        │ (retry_count < 2, not passed)
-      │ (fatal_error)                          └──→ rewrite_sections
-      └──→ END                                 │ (retry_count >= 2, not passed)
-                                               └──→ END
+prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ rewrite_sections ──→ validate_output ──→ format_output ──→ END
+      │ (fatal_error)         │ (fatal_error)      │ (fatal_error)                    │ (retry_count < 2, not passed)
+      └──→ END                └──→ END             └──→ END                          └──→ rewrite_sections
+                                                                                        │ (retry_count >= 2, not passed)
+                                                                                        └──→ format_output
 ```
 
 **Firm constraints:**
-- Exactly **2 HF calls per run**: `rewrite_sections` (Mistral-Small-3.1-24B) + `validate_output` (Llama-3.1-8B)
 - `prepare_inputs` and `format_output` are **pure Python — no LLM**
+- `understand_resume`, `analyze_inputs`, `rewrite_sections`, `validate_output` are LLM nodes — exactly **4 LLM calls per run** for the selected variant (one extra `rewrite_sections` call per retry, max 2 retries)
+- `analyze_inputs` makes **one combined call** for JD + resume analysis (`analysts/input_analyst.py::analyze_inputs_combined`) — the old two-call sequential path still exists in `jd_analyst.py`/`resume_analyst.py` as a fallback
+- `rewrite_sections` builds only the **selected tailoring variant** by default (`selected_variant`, defaults to `DEFAULT_VARIANT = balanced`); all 3 variants (conservative/balanced/bold) are only built together when retailoring a section after the fact
 - Max retry loop: `retry_count < 2` in `_after_validate()`
-- Claude is a **fallback only** — same node, triggers when HF returns 4xx/5xx
+- All LLM calls go through `AgentService`, which wraps whichever `LLMProvider` was selected (OpenAI/Anthropic/Gemini/Grok/HuggingFace) — there is no single hardcoded model anymore
 
 ### Key function signatures
 
 ```python
 # packages/agent/graph.py
 def build_graph(
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
-) -> CompiledGraph: ...
+): ...
 
 async def run_agent(
     initial: AgentState,
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> AgentState: ...
-
-# LLMComplete callable type
-LLMComplete = Callable[..., Awaitable[str]]
-# called as: await llm_complete(model="...", prompt="...", node="rewrite_sections")
 ```
 
 ### Checkpointer wiring
@@ -450,11 +502,22 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **Merged PR #2** |
 | `feature/nicegui-paywall-polish` | Device fingerprint auth, single-page SSE UX, post-payment polling, export gating | **Merged PR #3** |
+| `feature/ai-resume-agents` | Multi-provider `AgentService`, section agents, variant schemas | **Merged PR #4** |
+| `feature/ai-resume-ui` | AI resume dashboard (`/app/dashboard`) alongside the single-page workflow | **Merged PR #5** |
+| `feature/stripe-paywall-399` | Repriced unlock from $9.99 to $3.99 | **Merged PR #6** |
+| `feature/merge-input-analysis` | Combined JD+resume analysis into one LLM call | **Merged PR #7** |
+| `feature/faster-llm-models` | Faster default models for every provider | **Merged PR #8** |
+| `feature/backend-resume-upload-validation` | DOCX support + shared upload validation | **Merged PR #9** |
+| `feature/variant-selector` | Tailoring style (conservative/balanced/bold) selector; single-variant builds by default | **Merged PR #10** |
+| `feature/ui-runtime-fixes` | Upload/progress fixes, Stripe pricing display, Docker fixes | **Merged PR #11** |
+| `fix/submit-analysis-stuck` | Fixed UI submit deadlock (in-process run launch), checkpointer migration on fresh DBs, Stripe verify fallback | **Merged PR #12** |
+| `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, real `verify_docs` drift check in CI | **Not started** — PR #1 closed/abandoned (predates the provider/sections refactor); `schema.sql` still doesn't exist and the migration-doc test is a no-op |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
-| `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, `verify_docs` in CI | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + `gh` setup script | Not started |
 | `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager | Not started |
+
+**Known doc/code mismatch:** `docs/dev/codex.md` still says the NiceGUI frontend has a single page with no dashboard — that's no longer true; `/app/dashboard` is a real, linked, mounted route since PR #5. `codex.md` needs the same kind of refresh this file just got.
 
 ---
 
