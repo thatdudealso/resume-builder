@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+from packages.integrations.stripe_client import StripeCheckoutResult
+
 
 @pytest.mark.asyncio
 async def test_login_and_refresh_flow(client):
@@ -47,7 +49,10 @@ async def test_stripe_checkout_and_poll(client, monkeypatch):
     )
     monkeypatch.setattr(
         "apps.web.api.v1.billing.create_checkout_session",
-        lambda **kwargs: "https://checkout.test/session",
+        lambda **kwargs: StripeCheckoutResult(
+            url="https://checkout.test/session",
+            session_id="cs_test",
+        ),
     )
     checkout = await client.post(
         "/api/v1/billing/stripe/checkout",

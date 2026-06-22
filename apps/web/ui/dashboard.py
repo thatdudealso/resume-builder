@@ -1,16 +1,33 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
+from uuid import UUID
 
 from nicegui import ui
+from sqlalchemy import select
 
+from apps.web.services.run_launcher import (
+    RunLaunchError,
+    create_run_record,
+    execute_run_background,
+)
 from apps.web.ui.auth_guard import api_client
+from apps.web.ui.console_log import log_console
+from apps.web.ui.request_auth import request_user_session
 from apps.web.ui.run_progress import watch_run_progress
+from apps.web.ui.workflow_session import (
+    WORKFLOW_SESSION_SCRIPT,
+    apply_run_context,
+    save_browser_workflow,
+)
 from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
+from packages.db.models.resume import MasterResume
 
 STEPS = {
     "prepare_inputs": "Reading resume",
+    "understand_resume": "Understanding resume structure",
     "analyze_inputs": "Analyzing job fit",
     "rewrite_sections": "Tailoring sections",
     "validate_output": "Checking facts",
@@ -101,6 +118,7 @@ def dashboard_page() -> None:
         </style>
         """
         + _FINGERPRINT_SCRIPT
+        + WORKFLOW_SESSION_SCRIPT
     )
 
     state: dict[str, Any] = {
@@ -204,17 +222,25 @@ def dashboard_page() -> None:
 
     def _render_missing_sections(final: dict[str, Any]) -> None:
         missing_row.clear()
-        missing = final.get("sections_missing") or []
-        if not missing or not state.get("can_view_output"):
+        suggestions = final.get("sections_suggested") or []
+        if not suggestions or not state.get("can_view_output"):
             missing_row.classes(add="hidden")
             return
         missing_row.classes(remove="hidden")
         with missing_row:
-            ui.label("Missing sections — add content to tailor them:").classes(
+            ui.label("Optional sections you could add (not required for this output):").classes(
                 "text-sm font-medium"
             )
-            with ui.row().classes("gap-2 flex-wrap"):
-                for section in missing:
+            with ui.column().classes("gap-1"):
+                for item in suggestions:
+                    section = item.get("section", "section")
+                    reason = item.get("reason", "")
+                    ui.label(f"• {section}: {reason}").classes("text-sm rb-subtle")
+            with ui.row().classes("gap-2 flex-wrap mt-2"):
+                for item in suggestions:
+                    section = item.get("section")
+                    if not section:
+                        continue
                     ui.button(
                         f"Add {section}",
                         on_click=lambda s=section: open_add_section(s),
@@ -329,6 +355,13 @@ def dashboard_page() -> None:
 
         body = resp.json()
         final = body.get("final_output") or {}
+        apply_run_context(state, body)
+        if body.get("resume_filename"):
+            upload_status.set_text(f"Resume: {body['resume_filename']}")
+        elif state.get("resume_id"):
+            upload_status.set_text(f"Resume: saved ({str(state['resume_id'])[:8]}…)")
+        if body.get("jd_text") and not (jd_input.value or "").strip():
+            jd_input.value = body["jd_text"]
         is_locked = body.get("output_locked") and not final
         state["can_view_output"] = not is_locked
 
@@ -387,6 +420,12 @@ def dashboard_page() -> None:
         if len(jd) < 20:
             output.set_content("Job description must be at least 20 characters.")
             return
+        log_console(
+            "dashboard tailor: submit clicked",
+            jd_chars=len(jd),
+            provider=provider_select.value or "huggingface",
+            variant=variant_select.value or DEFAULT_VARIANT.value,
+        )
         progress.value = 0.05
         progress_label.set_text("Starting run...")
         paywall.classes(add="hidden")
@@ -398,27 +437,53 @@ def dashboard_page() -> None:
         output.classes(remove="rb-locked")
         output.set_content("_Processing..._")
 
-        async with api_client() as client:
-            resumes_resp = await client.get("/api/v1/resumes")
-            resumes = resumes_resp.json().get("resumes", [])
-            if not resumes:
-                output.set_content("Upload a resume first.")
-                return
-            run_resp = await client.post(
-                "/api/v1/runs",
-                json={
-                    "resume_id": resumes[0]["resume_id"],
-                    "jd_text": jd,
-                    "llm_provider": provider_select.value or "huggingface",
-                    "variant": variant_select.value or DEFAULT_VARIANT.value,
-                },
-            )
-        if run_resp.status_code != 200:
-            output.set_content(_format_detail(run_resp.text, "Could not start run"))
+        try:
+            async with request_user_session() as (session, user):
+                resume_id = state.get("resume_id")
+                if not resume_id:
+                    result = await session.execute(
+                        select(MasterResume.id)
+                        .where(MasterResume.user_id == user.id)
+                        .order_by(MasterResume.created_at.desc())
+                        .limit(1)
+                    )
+                    resume_id = result.scalar_one_or_none()
+                if not resume_id:
+                    output.set_content("Upload a resume first.")
+                    return
+                log_console(
+                    "dashboard tailor: creating run in-process",
+                    resume_id=str(resume_id),
+                )
+                run_data = await create_run_record(
+                    session,
+                    user,
+                    resume_id=UUID(str(resume_id)),
+                    jd_text=jd,
+                    llm_provider=provider_select.value or "huggingface",
+                    variant=variant_select.value or DEFAULT_VARIANT.value,
+                )
+        except RunLaunchError as exc:
+            log_console("dashboard tailor: run creation failed", level="error", detail=exc.detail)
+            output.set_content(exc.detail)
+            return
+        except Exception as exc:
+            log_console("dashboard tailor: unexpected error", level="error", detail=str(exc))
+            output.set_content(f"Could not start run: {exc}")
             return
 
-        state["run_id"] = run_resp.json()["run_id"]
-        await stream_progress(state["run_id"])
+        state["run_id"] = run_data["run_id"]
+        state["jd_text"] = jd
+        await save_browser_workflow(
+            run_id=run_data["run_id"],
+            resume_id=str(resume_id),
+            jd_text=jd,
+        )
+        log_console("dashboard tailor: run created", run_id=run_data["run_id"])
+        await asyncio.gather(
+            stream_progress(state["run_id"]),
+            execute_run_background(UUID(run_data["run_id"]), run_data["variant"]),
+        )
         await refresh_run()
         await load_status()
 
@@ -426,10 +491,15 @@ def dashboard_page() -> None:
         run_id = state.get("run_id")
         if not run_id:
             return
+        await save_browser_workflow(
+            run_id=str(run_id),
+            resume_id=str(state["resume_id"]) if state.get("resume_id") else None,
+            jd_text=(jd_input.value or "").strip(),
+        )
         async with api_client() as client:
             resp = await client.post("/api/v1/billing/stripe/checkout", json={"run_id": run_id})
         if resp.status_code == 200:
-            ui.navigate.to(resp.json()["checkout_url"], new_tab=True)
+            ui.navigate.to(resp.json()["checkout_url"])
 
     async def pay_crypto() -> None:
         run_id = state.get("run_id")

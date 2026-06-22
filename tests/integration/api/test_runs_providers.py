@@ -122,7 +122,7 @@ async def test_create_run_returns_selected_variant(client, monkeypatch):
     async def noop_run(run_id, variant=None):
         return None
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", noop_run)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", noop_run)
     resp = await client.post(
         "/api/v1/runs",
         json={
@@ -179,7 +179,7 @@ async def test_patch_variant_when_unlocked(client, monkeypatch):
                 }
                 await bg_session.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", fast_run)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", fast_run)
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},

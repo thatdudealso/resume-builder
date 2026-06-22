@@ -2,7 +2,6 @@
 """Regenerate docs/database/tables/*.md from SQLAlchemy models."""
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -28,8 +27,8 @@ TABLE_PURPOSES = {
 
 
 def main() -> None:
-    from packages.db.base import Base
     import packages.db.models  # noqa: F401
+    from packages.db.base import Base
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     table_names: list[str] = []
@@ -66,9 +65,9 @@ def main() -> None:
                 "",
                 "## Example Query",
                 "",
-                f"```sql",
+                "```sql",
                 f"SELECT * FROM {name} LIMIT 10;",
-                f"```",
+                "```",
                 "",
             ]
         )

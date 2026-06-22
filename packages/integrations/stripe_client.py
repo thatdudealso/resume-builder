@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 import stripe
@@ -7,6 +8,21 @@ import stripe
 from apps.web.config import settings
 
 stripe.api_key = settings.stripe_secret_key
+
+
+class StripeNotConfiguredError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class StripeCheckoutResult:
+    url: str
+    session_id: str
+
+
+def is_stripe_configured() -> bool:
+    key = (settings.stripe_secret_key or "").strip()
+    return bool(key) and not key.startswith("sk_test_fake")
 
 
 def _line_item() -> dict:
@@ -21,18 +37,28 @@ def _line_item() -> dict:
     }
 
 
-def create_checkout_session(*, user_id: str, run_id: str, email: str) -> str:
-    if not settings.stripe_secret_key or settings.stripe_secret_key.startswith("sk_test_fake"):
-        return f"https://checkout.stripe.test/session/{run_id}"
+def create_checkout_session(
+    *, user_id: str, run_id: str, email: str, resume_id: str
+) -> StripeCheckoutResult:
+    if not is_stripe_configured():
+        raise StripeNotConfiguredError(
+            "Stripe is not configured. Set STRIPE_SECRET_KEY in .env to enable checkout."
+        )
+    base = settings.cors_origin_list[0]
+    success_url = (
+        f"{base}/app/?paid=1&run_id={run_id}&resume_id={resume_id}"
+    )
     session = stripe.checkout.Session.create(
         mode="payment",
         customer_email=email,
         line_items=[_line_item()],
-        metadata={"user_id": user_id, "run_id": run_id},
-        success_url=f"{settings.cors_origin_list[0]}/app/?paid=1&run_id={run_id}",
-        cancel_url=f"{settings.cors_origin_list[0]}/app/?cancelled=1",
+        metadata={"user_id": user_id, "run_id": run_id, "resume_id": resume_id},
+        success_url=success_url,
+        cancel_url=f"{base}/app/?cancelled=1&run_id={run_id}&resume_id={resume_id}",
     )
-    return session.url or ""
+    if not session.url:
+        raise RuntimeError("Stripe checkout session did not return a URL")
+    return StripeCheckoutResult(url=session.url, session_id=str(session.id))
 
 
 def construct_event(payload: bytes, sig_header: str):

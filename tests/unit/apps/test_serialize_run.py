@@ -28,3 +28,5 @@ async def test_serialize_run_locked_without_view(session):
     payload = _serialize_run(run, False)
     assert payload["final_output"] is None
     assert payload["preview_text"] == "preview"
+    assert payload["master_resume_id"] == str(resume.id)
+    assert payload["jd_text"] == run.jd_text

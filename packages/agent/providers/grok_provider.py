@@ -7,6 +7,7 @@ from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
 _TASK_MODELS: dict[AgentTask, str] = {
+    AgentTask.RESUME_ORCHESTRATION: "grok-2-mini",
     AgentTask.INPUT_ANALYSIS: "grok-2-mini",
     AgentTask.JD_ANALYSIS: "grok-2-mini",
     AgentTask.RESUME_ANALYSIS: "grok-2-mini",

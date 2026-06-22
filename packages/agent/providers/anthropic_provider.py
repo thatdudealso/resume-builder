@@ -8,6 +8,7 @@ from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
 _TASK_MODELS: dict[AgentTask, str] = {
+    AgentTask.RESUME_ORCHESTRATION: "claude-3-5-haiku-20241022",
     AgentTask.INPUT_ANALYSIS: "claude-3-5-haiku-20241022",
     AgentTask.JD_ANALYSIS: "claude-3-5-haiku-20241022",
     AgentTask.RESUME_ANALYSIS: "claude-3-5-haiku-20241022",

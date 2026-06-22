@@ -23,17 +23,17 @@ def _source_sections(state: AgentState) -> dict[str, str]:
     return sources
 
 
-def _sections_to_tailor(
-    sources: dict[str, str],
-    missing: list[str],
-    user_added: dict[str, str],
-) -> list[tuple[str, str]]:
+def _sections_to_tailor(state: AgentState, sources: dict[str, str]) -> list[tuple[str, str]]:
+    """Tailor only sections with source content or explicitly user-added sections."""
+    user_added = state.get("user_added_sections") or {}
+    present = set(state.get("sections_to_tailor") or [])
     tailored: list[tuple[str, str]] = []
+
     for key in SECTION_KEYS:
-        if key in missing and key not in user_added:
-            continue
         text = user_added.get(key) or sources.get(key, "")
-        if text.strip():
+        if not text.strip():
+            continue
+        if key in user_added or key in present or not present:
             tailored.append((key, text))
     return tailored
 
@@ -50,11 +50,9 @@ async def build_all_variants(
     state: AgentState, agent_service: AgentService
 ) -> dict[str, dict[str, str]]:
     sources = _source_sections(state)
-    missing = state.get("sections_missing") or []
-    user_added = state.get("user_added_sections") or {}
     gaps = state.get("keyword_gaps") or []
     jd = state.get("jd_text", "")
-    to_tailor = _sections_to_tailor(sources, missing, user_added)
+    to_tailor = _sections_to_tailor(state, sources)
 
     variants: dict[str, dict[str, str]] = {}
     for variant in _variants_to_build(state):

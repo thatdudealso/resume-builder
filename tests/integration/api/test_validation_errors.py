@@ -4,13 +4,23 @@ import io
 
 import pytest
 
-from packages.integrations.stripe_client import create_checkout_session
+from packages.integrations.stripe_client import (
+    StripeNotConfiguredError,
+    create_checkout_session,
+    is_stripe_configured,
+)
 
 
-def test_stripe_fake_key_returns_test_url(monkeypatch):
+def test_stripe_not_configured_when_key_missing(monkeypatch):
+    monkeypatch.setattr("apps.web.config.settings.stripe_secret_key", "")
+    assert is_stripe_configured() is False
+    with pytest.raises(StripeNotConfiguredError):
+        create_checkout_session(user_id="u", run_id="r", email="a@b.com", resume_id="res1")
+
+
+def test_stripe_not_configured_for_fake_test_key(monkeypatch):
     monkeypatch.setattr("apps.web.config.settings.stripe_secret_key", "sk_test_fake")
-    url = create_checkout_session(user_id="u", run_id="r", email="a@b.com")
-    assert "stripe.test" in url
+    assert is_stripe_configured() is False
 
 
 @pytest.mark.asyncio

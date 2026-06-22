@@ -75,7 +75,16 @@ class AccessService:
             payment = await self.session.get(Payment, run.payment_id)
             if payment and payment.status == "confirmed":
                 return True
-        return False
+        result = await self.session.execute(
+            select(Payment)
+            .where(
+                Payment.run_id == run.id,
+                Payment.user_id == user_id,
+                Payment.status == "confirmed",
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def can_export(self, user_id: UUID, run: AgentRun) -> bool:
         if not await self.can_view_output(user_id, run):

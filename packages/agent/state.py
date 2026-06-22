@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any, TypedDict
 
+from packages.agent.schemas.variants import SECTION_KEYS
+
 
 class AgentState(TypedDict, total=False):
     run_id: str
@@ -17,6 +19,9 @@ class AgentState(TypedDict, total=False):
     resume_analysis: dict[str, Any]
     match_score_before: dict[str, Any]
     match_score_after: dict[str, Any]
+    resume_structure: dict[str, Any]
+    sections_to_tailor: list[str]
+    sections_suggested: list[dict[str, Any]]
     sections_missing: list[str]
     variants: dict[str, dict[str, str]]
     selected_variant: str
@@ -37,32 +42,143 @@ class AgentState(TypedDict, total=False):
     fatal_error: str
 
 
-SECTION_PATTERN = re.compile(
-    r"(?im)^(experience|education|skills|summary|work history|professional experience)\s*:?\s*$"
+_SECTION_ALIASES: dict[str, str] = {
+    "summary": "summary",
+    "objective": "summary",
+    "profile": "summary",
+    "about": "summary",
+    "about me": "summary",
+    "professional": "experience",
+    "professional experience": "experience",
+    "experience": "experience",
+    "work history": "experience",
+    "employment": "experience",
+    "employment history": "experience",
+    "education": "education",
+    "academic": "education",
+    "academic background": "education",
+    "skills": "skills",
+    "skill": "skills",
+    "technical skills": "skills",
+    "core competencies": "skills",
+    "technologies": "skills",
+}
+
+_SECTION_LINE_PATTERN = re.compile(
+    r"(?im)^("
+    r"summary|objective|profile|about(?:\s+me)?"
+    r"|professional(?:\s+experience)?|experience|work\s+history|employment(?:\s+history)?"
+    r"|education|academic(?:\s+background)?"
+    r"|skills?|technical\s+skills|core\s+competencies|technologies"
+    r")\s*:?\s*(.*)$"
+)
+
+_OTHER_SPLIT_MARKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "experience",
+        re.compile(
+            r"(?im)(?:^|\n)"
+            r"(?=(?:professional(?:\s+experience)?|experience|work\s+history|employment)\b)"
+        ),
+    ),
+    ("skills", re.compile(r"(?im)(?:^|\n)(?=(?:technical\s+)?skills\b|core\s+competencies\b)")),
+    ("education", re.compile(r"(?im)(?:^|\n)(?=education\b|academic(?:\s+background)?\b)")),
+    ("summary", re.compile(r"(?im)(?:^|\n)(?=(?:objective|summary|profile)\b)")),
 )
 
 
-def split_sections(text: str) -> dict[str, str]:
+def _canonical_section(header: str) -> str | None:
+    normalized = re.sub(r"\s+", " ", header.strip().lower())
+    return _SECTION_ALIASES.get(normalized)
+
+
+def _append_line(sections: dict[str, list[str]], section: str, line: str) -> None:
+    if line.strip():
+        sections.setdefault(section, []).append(line)
+
+
+def _split_sections_raw(text: str) -> dict[str, str]:
     lines = text.splitlines()
-    sections: dict[str, list[str]] = {"summary": [], "experience": [], "skills": [], "other": []}
-    current = "other"
+    buckets: dict[str, list[str]] = {
+        "header": [],
+        "summary": [],
+        "experience": [],
+        "skills": [],
+        "education": [],
+        "other": [],
+    }
+    current = "header"
+
     for line in lines:
-        match = SECTION_PATTERN.match(line.strip())
+        match = _SECTION_LINE_PATTERN.match(line.strip())
         if match:
-            key = match.group(1).lower()
-            if "experience" in key or "work" in key or "professional" in key:
-                current = "experience"
-            elif "education" in key:
-                current = "education"
-            elif "skill" in key:
-                current = "skills"
-            elif "summary" in key:
-                current = "summary"
-            else:
-                current = "other"
+            canonical = _canonical_section(match.group(1))
+            if canonical:
+                current = canonical
+                remainder = (match.group(2) or "").strip()
+                if remainder:
+                    _append_line(buckets, current, remainder)
+                continue
+        _append_line(buckets, current, line)
+
+    return {k: "\n".join(v).strip() for k, v in buckets.items() if v}
+
+
+def _redistribute_other(sections: dict[str, str]) -> dict[str, str]:
+    other = sections.get("other", "").strip()
+    if not other:
+        return sections
+
+    result = dict(sections)
+    other_text = result.pop("other", "")
+    if not other_text:
+        return result
+
+    split_at: list[tuple[int, str]] = [(0, "other")]
+    for section, pattern in _OTHER_SPLIT_MARKERS:
+        for match in pattern.finditer(other_text):
+            split_at.append((match.start(), section))
+
+    split_at = sorted(set(split_at), key=lambda item: item[0])
+    if len(split_at) == 1:
+        if not result.get("summary") and not result.get("experience"):
+            result["summary"] = other_text
+        else:
+            result["other"] = other_text
+        return result
+
+    chunks: list[tuple[str, str]] = []
+    for index, (start, section) in enumerate(split_at):
+        end = split_at[index + 1][0] if index + 1 < len(split_at) else len(other_text)
+        chunk = other_text[start:end].strip()
+        if chunk:
+            chunks.append((section, chunk))
+
+    for section, chunk in chunks:
+        cleaned = re.sub(
+            r"(?im)^(?:objective|summary|profile|professional(?:\s+experience)?|"
+            r"experience|work\s+history|employment|education|academic(?:\s+background)?|"
+            r"skills?|technical\s+skills|core\s+competencies|technologies)\s*:?\s*",
+            "",
+            chunk,
+            count=1,
+        ).strip()
+        if not cleaned:
             continue
-        sections.setdefault(current, []).append(line)
-    return {k: "\n".join(v).strip() for k, v in sections.items() if v}
+        if result.get(section):
+            result[section] = f"{result[section]}\n\n{cleaned}"
+        else:
+            result[section] = cleaned
+
+    return result
+
+
+def split_sections(text: str) -> dict[str, str]:
+    return _redistribute_other(_split_sections_raw(text))
+
+
+def structured_sections_missing(structured: dict[str, str]) -> list[str]:
+    return [key for key in SECTION_KEYS if not structured.get(key, "").strip()]
 
 
 def extract_keywords(jd_text: str) -> list[str]:

@@ -58,7 +58,7 @@ async def test_export_locked_then_unlocked(client, session, monkeypatch):
                 run.is_free_trial_run = True
                 await bg.commit()
 
-    monkeypatch.setattr("apps.web.api.v1.runs._run_background", fake_run)
+    monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", fake_run)
     run_resp = await client.post(
         "/api/v1/runs",
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},

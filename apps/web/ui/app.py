@@ -1,17 +1,36 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
+from uuid import UUID
 
 from nicegui import ui
 from nicegui.storage import request_contextvar
 
+from apps.web.services.run_launcher import (
+    RunLaunchError,
+    create_run_record,
+    execute_run_background,
+)
 from apps.web.ui.auth_guard import api_client
+from apps.web.ui.console_log import log_console
+from apps.web.ui.request_auth import request_user_session
 from apps.web.ui.run_progress import watch_run_progress
+from apps.web.ui.workflow_session import (
+    WORKFLOW_SESSION_SCRIPT,
+    apply_run_context,
+    clear_browser_workflow,
+    ensure_device_fingerprint,
+    load_browser_workflow,
+    merge_query_workflow_state,
+    save_browser_workflow,
+)
 from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
 
 STEPS = {
     "prepare_inputs": "Reading resume",
+    "understand_resume": "Understanding resume structure",
     "analyze_inputs": "Analyzing job fit",
     "rewrite_sections": "Tailoring content",
     "validate_output": "Checking facts",
@@ -179,6 +198,7 @@ def _install_page_shell() -> None:
           window.rbFingerprint.get();
         </script>
         """
+        + WORKFLOW_SESSION_SCRIPT
     )
 
 
@@ -186,11 +206,13 @@ def _install_page_shell() -> None:
 def index_page() -> None:
     _install_page_shell()
     request = _request()
-    query = request.query_params if request is not None else {}
+    query = dict(request.query_params) if request is not None else {}
     paid_return = query.get("paid") == "1" and bool(query.get("run_id"))
 
     state: dict[str, Any] = {
         "run_id": query.get("run_id"),
+        "resume_id": query.get("resume_id"),
+        "jd_text": None,
         "payment_id": None,
         "poll_payment": paid_return,
     }
@@ -302,13 +324,45 @@ def index_page() -> None:
         upload_label = "yes" if user.get("can_upload") else "payment required"
         price = float(billing.get("price_usd", 3.99))
         paywall_price.set_text(f"Unlock for {_format_price(price)}")
+        state["stripe_configured"] = billing.get("stripe_configured", False)
+        if not state["stripe_configured"]:
+            stripe_button.props("disable")
+            crypto_status.set_text(
+                "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+            )
+        else:
+            stripe_button.props(remove="disable")
+            if not state.get("poll_payment"):
+                crypto_status.set_text("")
         status_label.set_text(
             f"Free trial: {free_label} · Upload: {upload_label} · "
             f"Unlock: {_format_price(price)}"
         )
         if resumes:
-            resume_label.set_text(f"Resume: {resumes[0]['filename']}")
-            state["resume_id"] = resumes[0]["resume_id"]
+            match = None
+            if state.get("resume_id"):
+                match = next(
+                    (r for r in resumes if r["resume_id"] == str(state["resume_id"])),
+                    None,
+                )
+            target = match or resumes[0]
+            resume_label.set_text(f"Resume: {target['filename']}")
+            state["resume_id"] = target["resume_id"]
+        elif state.get("resume_id"):
+            resume_label.set_text(f"Resume: saved ({str(state['resume_id'])[:8]}…)")
+
+    def apply_form_from_state(body: dict[str, Any] | None = None) -> None:
+        if body:
+            apply_run_context(state, body)
+        resume_id = state.get("resume_id")
+        filename = (body or {}).get("resume_filename")
+        if filename:
+            resume_label.set_text(f"Resume: {filename}")
+        elif resume_id:
+            resume_label.set_text(f"Resume: saved ({str(resume_id)[:8]}…)")
+        jd_text = state.get("jd_text")
+        if jd_text and not (jd_input.value or "").strip():
+            jd_input.value = jd_text
 
     async def handle_upload(event: Any) -> None:
         upload_file = event.file
@@ -360,7 +414,8 @@ def index_page() -> None:
 
         body = response.json()
         state["current_run"] = body
-        is_locked = body.get("output_locked") and not body.get("final_output")
+        apply_form_from_state(body)
+        is_locked = bool(body.get("output_locked")) and not body.get("final_output")
         if is_locked:
             export_row.classes(add="hidden")
             output.classes(add="rb-locked")
@@ -407,14 +462,20 @@ def index_page() -> None:
         if not run_id:
             return
         stripe_button.props("loading")
+        await save_browser_workflow(
+            run_id=str(run_id),
+            resume_id=str(state["resume_id"]) if state.get("resume_id") else None,
+            jd_text=(jd_input.value or "").strip(),
+        )
         async with api_client() as client:
             response = await client.post("/api/v1/billing/stripe/checkout", json={"run_id": run_id})
         stripe_button.props(remove="loading")
         if response.status_code == 200:
-            ui.navigate.to(response.json()["checkout_url"], new_tab=True)
-            payment_status.set_text("Waiting for Stripe confirmation...")
+            ui.navigate.to(response.json()["checkout_url"])
+            payment_status.set_text("Redirecting to Stripe…")
             state["poll_payment"] = True
             return
+        payment_status.set_text(_format_detail(response.text, "Stripe checkout failed"))
         crypto_status.set_text(_format_detail(response.text, "Stripe checkout failed"))
 
     async def pay_crypto() -> None:
@@ -461,6 +522,13 @@ def index_page() -> None:
             output.set_content("Upload a resume before tailoring.")
             return
 
+        log_console(
+            "tailor: submit clicked",
+            resume_id=resume_id,
+            jd_chars=len(jd_text),
+            provider=provider_select.value or "huggingface",
+            variant=variant_select.value or DEFAULT_VARIANT.value,
+        )
         run_button.props("loading")
         progress.value = 0.05
         progress_label.set_text("Creating run")
@@ -470,25 +538,43 @@ def index_page() -> None:
         paywall_dialog.close()
         export_row.classes(add="hidden")
 
-        async with api_client() as client:
-            response = await client.post(
-                "/api/v1/runs",
-                json={
-                    "resume_id": resume_id,
-                    "jd_text": jd_text,
-                    "llm_provider": provider_select.value or "huggingface",
-                    "variant": variant_select.value or DEFAULT_VARIANT.value,
-                },
-            )
-        if response.status_code != 200:
+        try:
+            async with request_user_session() as (session, user):
+                log_console("tailor: creating run in-process (avoiding HTTP self-call)")
+                data = await create_run_record(
+                    session,
+                    user,
+                    resume_id=UUID(str(resume_id)),
+                    jd_text=jd_text,
+                    llm_provider=provider_select.value or "huggingface",
+                    variant=variant_select.value or DEFAULT_VARIANT.value,
+                )
+        except RunLaunchError as exc:
+            log_console("tailor: run creation failed", level="error", detail=exc.detail)
             run_button.props(remove="loading")
-            output.set_content(_format_detail(response.text, "Could not start run"))
+            output.set_content(exc.detail)
+            return
+        except Exception as exc:
+            log_console("tailor: unexpected error", level="error", detail=str(exc))
+            run_button.props(remove="loading")
+            output.set_content(f"Could not start run: {exc}")
             return
 
-        data = response.json()
+        log_console("tailor: run created", run_id=data["run_id"], status=data.get("status"))
         state["run_id"] = data["run_id"]
+        state["jd_text"] = jd_text
+        await save_browser_workflow(
+            run_id=data["run_id"],
+            resume_id=str(resume_id),
+            jd_text=jd_text,
+        )
         try:
-            result = await stream_progress(data["run_id"])
+            log_console("tailor: starting execution and progress watch")
+            result, _ = await asyncio.gather(
+                stream_progress(data["run_id"]),
+                execute_run_background(UUID(data["run_id"]), data["variant"]),
+            )
+            log_console("tailor: progress finished", run_id=data["run_id"], result=result)
             if result == "error":
                 await refresh_run(show_paywall=False)
                 return
@@ -499,24 +585,57 @@ def index_page() -> None:
 
     run_button.on_click(tailor)
 
+    async def sync_payment_status() -> bool:
+        run_id = state.get("run_id")
+        if not run_id:
+            return False
+        async with api_client() as client:
+            response = await client.post("/api/v1/billing/stripe/verify", json={"run_id": run_id})
+        if response.status_code != 200:
+            return False
+        data = response.json()
+        return bool(data.get("unlocked")) and not bool(data.get("output_locked"))
+
     async def poll_after_payment() -> None:
         if not state.get("poll_payment"):
             return
+        await sync_payment_status()
         body = await refresh_run(show_paywall=False)
-        if body and not body.get("output_locked"):
+        if body and body.get("final_output"):
             state["poll_payment"] = False
             paywall_dialog.close()
             payment_status.set_text("Payment confirmed. Output unlocked.")
             await load_account()
+            await clear_browser_workflow()
+        elif body and not body.get("output_locked"):
+            state["poll_payment"] = False
+            paywall_dialog.close()
+            payment_status.set_text("Payment confirmed. Output unlocked.")
+            await load_account()
+            await clear_browser_workflow()
         else:
             payment_status.set_text("Waiting for payment confirmation...")
 
-    ui.timer(0.1, load_providers, once=True)
-    ui.timer(0.1, load_account, once=True)
-    ui.timer(0.1, lambda: ui.run_javascript("window.rbFingerprint.get();"), once=True)
+    async def bootstrap_workflow() -> None:
+        await ensure_device_fingerprint()
+        stored = await load_browser_workflow()
+        merge_query_workflow_state(state, query, stored)
+        apply_form_from_state()
+        await load_providers()
+        await load_account()
+        apply_form_from_state()
+        if state.get("run_id"):
+            if state.get("poll_payment"):
+                await sync_payment_status()
+            await refresh_run(show_paywall=state.get("poll_payment", False))
+            body = state.get("current_run") or {}
+            if body.get("final_output") or not body.get("output_locked"):
+                state["poll_payment"] = False
+                paywall_dialog.close()
+                await clear_browser_workflow()
+
+    ui.timer(0.1, bootstrap_workflow, once=True)
     ui.timer(2.5, poll_after_payment)
-    if state.get("run_id"):
-        ui.timer(0.2, lambda: refresh_run(show_paywall=state["poll_payment"]), once=True)
 
 
 def mount_ui() -> None:

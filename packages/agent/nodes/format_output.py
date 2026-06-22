@@ -6,10 +6,14 @@ from packages.agent.service import AgentService
 from packages.agent.state import AgentState, split_sections
 
 
-def _plain_text(sections: dict[str, str]) -> str:
-    return "\n\n".join(
-        f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key)
+def _plain_text(sections: dict[str, str], *, header: str = "") -> str:
+    parts: list[str] = []
+    if header.strip():
+        parts.append(header.strip())
+    parts.extend(
+        f"{key.upper()}\n{sections[key]}" for key in SECTION_KEYS if sections.get(key, "").strip()
     )
+    return "\n\n".join(parts)
 
 
 def format_output(state: AgentState, agent_service: AgentService | None = None) -> AgentState:
@@ -19,6 +23,7 @@ def format_output(state: AgentState, agent_service: AgentService | None = None) 
         state.get("master_resume_text", "")
     )
     overrides = state.get("user_section_overrides") or {}
+    header = original_sections.get("header", "")
 
     variant_payload: dict[str, dict[str, object]] = {}
     for variant in VARIANT_ORDER:
@@ -28,7 +33,7 @@ def format_output(state: AgentState, agent_service: AgentService | None = None) 
         for section, override in overrides.items():
             if override:
                 sections[section] = override
-        plain = _plain_text(sections)
+        plain = _plain_text(sections, header=header)
         match_after = None
         if agent_service and state.get("jd_analysis") and state.get("resume_analysis"):
             match_after = agent_service.score_match(
@@ -45,7 +50,7 @@ def format_output(state: AgentState, agent_service: AgentService | None = None) 
     selected_sections = dict(variant_payload.get(selected, {}).get("sections", {}))
     if not selected_sections:
         selected_sections = state.get("section_drafts") or {}
-    plain = _plain_text(selected_sections)
+    plain = _plain_text(selected_sections, header=header)
 
     changelog = state.get("changelog") or build_changelog(original_sections, variants)
     sections_editable = state.get("sections_editable") or build_sections_editable(
@@ -74,6 +79,8 @@ def format_output(state: AgentState, agent_service: AgentService | None = None) 
             "current_overall": match_after_dict.get("overall"),
         },
         "sections_missing": state.get("sections_missing", []),
+        "sections_suggested": state.get("sections_suggested", []),
+        "resume_structure": state.get("resume_structure"),
         "jd_analysis": state.get("jd_analysis"),
         "resume_analysis": state.get("resume_analysis"),
     }
