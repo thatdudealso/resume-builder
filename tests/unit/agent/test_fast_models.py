@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL, AnthropicProvider
 from packages.agent.providers.base import AgentTask
-from packages.agent.providers.gemini_provider import GeminiProvider
-from packages.agent.providers.grok_provider import GrokProvider
+from packages.agent.providers.gemini_provider import GEMINI_FLASH_MODEL, GeminiProvider
+from packages.agent.providers.grok_provider import GROK_MODEL, GrokProvider
 from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
 
@@ -23,13 +23,13 @@ def test_anthropic_uses_fast_models():
 def test_gemini_uses_fast_models():
     provider = GeminiProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "gemini-2.0-flash-lite"
+        assert provider.model_for_task(task) == GEMINI_FLASH_MODEL
 
 
 def test_grok_uses_fast_models():
     provider = GrokProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "grok-2-mini"
+        assert provider.model_for_task(task) == GROK_MODEL
 
 
 def test_huggingface_uses_fast_models():
