@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from packages.agent.providers.anthropic_provider import AnthropicProvider
+from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL, AnthropicProvider
 from packages.agent.providers.base import AgentTask
 from packages.agent.providers.gemini_provider import GeminiProvider
 from packages.agent.providers.grok_provider import GrokProvider
@@ -17,7 +17,7 @@ def test_openai_uses_fast_models():
 def test_anthropic_uses_fast_models():
     provider = AnthropicProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "claude-3-5-haiku-20241022"
+        assert provider.model_for_task(task) == ANTHROPIC_OPUS_MODEL
 
 
 def test_gemini_uses_fast_models():
