@@ -6,13 +6,15 @@ from packages.agent.providers._mock import mock_complete
 from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
+GROK_MODEL = "grok-4.3"
+
 _TASK_MODELS: dict[AgentTask, str] = {
-    AgentTask.RESUME_ORCHESTRATION: "grok-2-mini",
-    AgentTask.INPUT_ANALYSIS: "grok-2-mini",
-    AgentTask.JD_ANALYSIS: "grok-2-mini",
-    AgentTask.RESUME_ANALYSIS: "grok-2-mini",
-    AgentTask.SECTION_REWRITE: "grok-2-mini",
-    AgentTask.VALIDATION: "grok-2-mini",
+    AgentTask.RESUME_ORCHESTRATION: GROK_MODEL,
+    AgentTask.INPUT_ANALYSIS: GROK_MODEL,
+    AgentTask.JD_ANALYSIS: GROK_MODEL,
+    AgentTask.RESUME_ANALYSIS: GROK_MODEL,
+    AgentTask.SECTION_REWRITE: GROK_MODEL,
+    AgentTask.VALIDATION: GROK_MODEL,
 }
 
 
