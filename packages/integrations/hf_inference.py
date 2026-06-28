@@ -6,6 +6,7 @@ import time
 import httpx
 
 from apps.web.config import settings
+from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL
 
 _circuit_open_until: float = 0.0
 _failure_count: int = 0
@@ -60,11 +61,8 @@ async def _claude_fallback(prompt: str, node: str) -> str:
     import anthropic
 
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    model = (
-        "claude-3-5-haiku-20241022" if node == "validate_output" else "claude-3-5-sonnet-20241022"
-    )
     msg = await client.messages.create(
-        model=model,
+        model=ANTHROPIC_OPUS_MODEL,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
