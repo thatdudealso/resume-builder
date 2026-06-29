@@ -421,7 +421,7 @@ def index_page() -> None:
             output.classes(add="rb-locked")
             output.set_content(f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}")
             payment_status.set_text("Payment required to reveal the full tailored resume.")
-            if show_paywall:
+            if show_paywall or body.get("status") == "completed":
                 paywall_dialog.open()
             return body
 

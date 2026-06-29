@@ -15,7 +15,6 @@ from packages.agent.schemas.providers import DEFAULT_PROVIDER
 from packages.agent.schemas.variants import DEFAULT_VARIANT
 from packages.agent.service import AgentService
 from packages.core.access.service import AccessService
-from packages.core.schemas.access import RunAccessMode
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.agent_run_event import AgentRunEvent
 from packages.db.models.resume import MasterResume
@@ -57,9 +56,8 @@ async def execute_run(
 
     queue = get_run_queue(str(run_id))
     access = AccessService(session)
-    decision = await access.can_start_run(run.user_id)
-    output_locked = decision.mode == RunAccessMode.LOCKED
-    is_free = decision.mode == RunAccessMode.FREE
+    output_locked = bool(run.output_locked)
+    is_free = bool(run.is_free_trial_run)
 
     provider_name = run.llm_provider or DEFAULT_PROVIDER.value
     agent_service = AgentService(provider_name)

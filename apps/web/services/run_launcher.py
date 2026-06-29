@@ -11,7 +11,7 @@ from packages.agent.providers.registry import get_provider
 from packages.agent.schemas.providers import LLMProviderName
 from packages.agent.schemas.variants import VariantName
 from packages.core.access.service import AccessService
-from packages.core.schemas.access import RunAccessMode
+from packages.core.schemas.access import RunAccessDecision, RunAccessMode
 from packages.core.security.sanitization import sanitize_text
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.resume import MasterResume
@@ -65,6 +65,14 @@ async def create_run_record(
     decision = await access.can_start_run(user.id)
     if decision.mode == RunAccessMode.BLOCKED:
         raise RunLaunchError(403, decision.message)
+    active_payment = None
+    if decision.mode == RunAccessMode.PAID:
+        active_payment = await access.get_active_payment(user.id)
+        if active_payment is None:
+            decision = RunAccessDecision(
+                mode=RunAccessMode.LOCKED,
+                message="Payment window expired. Output will be locked until payment.",
+            )
     jd = sanitize_text(jd_text)
     run = AgentRun(
         user_id=user.id,
@@ -73,6 +81,7 @@ async def create_run_record(
         llm_provider=provider_name.value,
         output_locked=decision.mode == RunAccessMode.LOCKED,
         is_free_trial_run=decision.mode == RunAccessMode.FREE,
+        payment_id=active_payment.id if active_payment else None,
     )
     session.add(run)
     await session.commit()

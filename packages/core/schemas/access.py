@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class RunAccessMode(StrEnum):
     FREE = "free"
+    PAID = "paid"
     LOCKED = "locked"
     BLOCKED = "blocked"
 
