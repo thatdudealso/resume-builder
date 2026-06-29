@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 
@@ -10,6 +13,8 @@ from apps.web.services.run_launcher import (
     create_run_record,
 )
 from packages.core.security.jwt import register_user
+from packages.db.models.agent_run import AgentRun
+from packages.db.models.payment import Payment
 from packages.db.models.resume import MasterResume
 
 
@@ -72,6 +77,45 @@ async def test_create_and_schedule_run_schedules_background(session, monkeypatch
 
     assert result["run_id"]
     assert scheduled == ["task"]
+
+
+@pytest.mark.asyncio
+async def test_create_run_record_uses_active_payment_window(session):
+    user = await register_user(session, "launcher-paid-window@test.com", "password123")
+    user.free_trial_used = True
+    await session.flush()
+    resume = MasterResume(
+        user_id=user.id,
+        filename="r.txt",
+        s3_key="k",
+        raw_text="SUMMARY\nEngineer\nEXPERIENCE\nPython dev 2020-2022.",
+    )
+    payment = Payment(
+        user_id=user.id,
+        provider="stripe",
+        provider_payment_id="pi_launcher_window",
+        idempotency_key="launcher-window",
+        amount_usd=Decimal("3.99"),
+        status="confirmed",
+        confirmed_at=datetime.now(UTC),
+    )
+    session.add_all([resume, payment])
+    await session.commit()
+
+    result = await create_run_record(
+        session,
+        user,
+        resume_id=resume.id,
+        jd_text="Python developer required " * 5,
+        llm_provider="huggingface",
+        variant="balanced",
+    )
+
+    run = await session.get(AgentRun, UUID(str(result["run_id"])))
+    assert result["output_locked"] is False
+    assert run is not None
+    assert run.is_free_trial_run is False
+    assert run.payment_id == payment.id
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.core.schemas.access import AccessSnapshot, RunAccessDecision, RunAccessMode
@@ -16,6 +17,27 @@ class AccessService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    @staticmethod
+    def payment_window_started_at(payment: Payment) -> datetime | None:
+        return payment.confirmed_at or payment.created_at
+
+    @staticmethod
+    def payment_window_expires_at(payment: Payment) -> datetime | None:
+        started_at = AccessService.payment_window_started_at(payment)
+        if started_at is None:
+            return None
+        return started_at + timedelta(hours=24)
+
+    def _active_payment_predicate(self):
+        cutoff = datetime.now(UTC) - timedelta(hours=24)
+        return and_(
+            Payment.status == "confirmed",
+            or_(
+                Payment.confirmed_at >= cutoff,
+                and_(Payment.confirmed_at.is_(None), Payment.created_at >= cutoff),
+            ),
+        )
+
     async def get_user(self, user_id: UUID) -> User | None:
         result = await self.session.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
@@ -28,11 +50,23 @@ class AccessService:
         )
         return (result.scalar() or 0) > 0
 
+    async def get_active_payment(self, user_id: UUID) -> Payment | None:
+        result = await self.session.execute(
+            select(Payment)
+            .where(Payment.user_id == user_id, self._active_payment_predicate())
+            .order_by(Payment.confirmed_at.desc().nullslast(), Payment.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def has_active_payment_window(self, user_id: UUID) -> bool:
+        return await self.get_active_payment(user_id) is not None
+
     async def get_snapshot(self, user_id: UUID) -> AccessSnapshot:
         user = await self.get_user(user_id)
         if user is None:
             raise ValueError("User not found")
-        has_payment = await self.has_confirmed_payment(user_id)
+        has_payment = await self.has_active_payment_window(user_id)
         can_upload = not user.free_trial_used or has_payment
         return AccessSnapshot(
             user_id=user_id,
@@ -42,10 +76,8 @@ class AccessService:
         )
 
     async def can_upload_resume(self, user_id: UUID) -> bool:
-        if await self.has_confirmed_payment(user_id):
+        if await self.has_active_payment_window(user_id):
             return True
-        from sqlalchemy import func
-
 
         result = await self.session.execute(
             select(func.count())
@@ -61,6 +93,8 @@ class AccessService:
             return RunAccessDecision(mode=RunAccessMode.BLOCKED, message="User not found")
         if not user.free_trial_used:
             return RunAccessDecision(mode=RunAccessMode.FREE)
+        if await self.has_active_payment_window(user_id):
+            return RunAccessDecision(mode=RunAccessMode.PAID)
         return RunAccessDecision(
             mode=RunAccessMode.LOCKED,
             message="Output will be locked until payment.",
@@ -101,6 +135,8 @@ class AccessService:
         run.output_locked = False
         run.payment_id = payment_id
         payment.status = "confirmed"
+        if payment.confirmed_at is None:
+            payment.confirmed_at = datetime.now(UTC)
         payment.run_id = run_id
         await self.session.flush()
 

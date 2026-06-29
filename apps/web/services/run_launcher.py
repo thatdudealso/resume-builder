@@ -65,6 +65,9 @@ async def create_run_record(
     decision = await access.can_start_run(user.id)
     if decision.mode == RunAccessMode.BLOCKED:
         raise RunLaunchError(403, decision.message)
+    active_payment = None
+    if decision.mode == RunAccessMode.PAID:
+        active_payment = await access.get_active_payment(user.id)
     jd = sanitize_text(jd_text)
     run = AgentRun(
         user_id=user.id,
@@ -73,6 +76,7 @@ async def create_run_record(
         llm_provider=provider_name.value,
         output_locked=decision.mode == RunAccessMode.LOCKED,
         is_free_trial_run=decision.mode == RunAccessMode.FREE,
+        payment_id=active_payment.id if active_payment else None,
     )
     session.add(run)
     await session.commit()
