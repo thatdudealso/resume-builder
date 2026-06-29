@@ -28,7 +28,7 @@ async def score_preview(
     body: ScorePreviewRequest,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
-):
+) -> dict[str, object]:
     resume = await session.get(MasterResume, body.resume_id)
     if resume is None or resume.user_id != user.id:
         raise HTTPException(status_code=404, detail="Resume not found")

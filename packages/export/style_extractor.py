@@ -6,7 +6,7 @@ from docx import Document
 from docx.shared import Pt
 
 
-def extract_docx_styles(data: bytes) -> dict:
+def extract_docx_styles(data: bytes) -> dict[str, object]:
     """Return a best-effort style summary from a DOCX: fonts, sizes, spacing."""
     doc = Document(io.BytesIO(data))
 
