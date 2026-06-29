@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from packages.core.schemas.access import AccessSnapshot, RunAccessDecision, RunAccessMode
 from packages.db.models.agent_run import AgentRun
@@ -28,7 +29,7 @@ class AccessService:
             return None
         return started_at + timedelta(hours=24)
 
-    def _active_payment_predicate(self):
+    def _active_payment_predicate(self) -> ColumnElement[bool]:
         cutoff = datetime.now(UTC) - timedelta(hours=24)
         return and_(
             Payment.status == "confirmed",
