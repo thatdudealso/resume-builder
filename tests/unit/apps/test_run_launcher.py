@@ -119,6 +119,55 @@ async def test_create_run_record_uses_active_payment_window(session):
 
 
 @pytest.mark.asyncio
+async def test_create_run_record_fails_closed_when_paid_without_active_payment(
+    session, monkeypatch
+):
+    user = await register_user(session, "launcher-paid-missing@test.com", "password123")
+    user.free_trial_used = True
+    await session.flush()
+    resume = MasterResume(
+        user_id=user.id,
+        filename="r.txt",
+        s3_key="k",
+        raw_text="SUMMARY\nEngineer\nEXPERIENCE\nPython dev 2020-2022.",
+    )
+    session.add(resume)
+    await session.commit()
+
+    from packages.core.schemas.access import RunAccessDecision, RunAccessMode
+
+    async def fake_can_start_run(self, user_id):
+        return RunAccessDecision(mode=RunAccessMode.PAID)
+
+    async def fake_get_active_payment(self, user_id):
+        return None
+
+    monkeypatch.setattr(
+        "apps.web.services.run_launcher.AccessService.can_start_run",
+        fake_can_start_run,
+    )
+    monkeypatch.setattr(
+        "apps.web.services.run_launcher.AccessService.get_active_payment",
+        fake_get_active_payment,
+    )
+
+    result = await create_run_record(
+        session,
+        user,
+        resume_id=resume.id,
+        jd_text="Python developer required " * 5,
+        llm_provider="huggingface",
+        variant="balanced",
+    )
+
+    run = await session.get(AgentRun, UUID(str(result["run_id"])))
+    assert result["output_locked"] is True
+    assert run is not None
+    assert run.payment_id is None
+    assert run.is_free_trial_run is False
+
+
+@pytest.mark.asyncio
 async def test_create_run_record_rejects_missing_resume(session):
     user = await register_user(session, "launcher-missing@test.com", "password123")
     await session.commit()
