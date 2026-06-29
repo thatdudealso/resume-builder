@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from packages.agent.providers.anthropic_provider import AnthropicProvider
 from packages.agent.providers.base import AgentTask
 from packages.agent.providers.gemini_provider import GeminiProvider
@@ -8,31 +10,53 @@ from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
 
 
-def test_openai_uses_fast_models():
-    provider = OpenAIProvider()
+def _all_tasks_have_models(provider_cls) -> None:
+    provider = provider_cls()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "gpt-4o-mini"
+        model = provider.model_for_task(task)
+        assert model and isinstance(model, str), f"No model for {task}"
 
 
-def test_anthropic_uses_fast_models():
+def _rewrite_uses_quality_model(provider_cls, quality_model: str) -> None:
+    provider = provider_cls()
+    assert provider.model_for_task(AgentTask.SECTION_REWRITE) == quality_model
+
+
+def _analysis_uses_fast_model(provider_cls, fast_model: str) -> None:
+    provider = provider_cls()
+    for task in [AgentTask.INPUT_ANALYSIS, AgentTask.JD_ANALYSIS, AgentTask.RESUME_ANALYSIS]:
+        assert provider.model_for_task(task) == fast_model, f"Expected {fast_model} for {task}"
+
+
+def test_all_providers_cover_all_tasks():
+    for cls in [AnthropicProvider, OpenAIProvider, GeminiProvider, GrokProvider, HuggingFaceProvider]:
+        _all_tasks_have_models(cls)
+
+
+def test_anthropic_uses_opus():
     provider = AnthropicProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "claude-3-5-haiku-20241022"
+        assert provider.model_for_task(task) == "claude-opus-4-8"
 
 
-def test_gemini_uses_fast_models():
+def test_openai_model_tiers():
+    _rewrite_uses_quality_model(OpenAIProvider, "gpt-4o")
+    _analysis_uses_fast_model(OpenAIProvider, "gpt-4o-mini")
+
+
+def test_gemini_uses_flash():
     provider = GeminiProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "gemini-2.0-flash-lite"
+        assert provider.model_for_task(task) == "gemini-3.5-flash"
 
 
-def test_grok_uses_fast_models():
+def test_grok_uses_latest():
     provider = GrokProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "grok-2-mini"
+        assert provider.model_for_task(task) == "grok-4.3"
 
 
-def test_huggingface_uses_fast_models():
+def test_huggingface_uses_latest_llama():
     provider = HuggingFaceProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "meta-llama/Llama-3.1-8B-Instruct"
+        assert provider.model_for_task(task) == "meta-llama/Llama-3.3-70B-Instruct"

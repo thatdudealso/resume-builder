@@ -7,7 +7,7 @@
 
 ## 1. What This App Does
 
-Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/TXT), pastes a job description, and gets a rewritten resume with job-description keywords injected — no hallucinated facts.
+Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, and gets three tailored resume variations — language actively mirrored from the JD — with before/after job-fit scores and LLM coaching bullets. No hallucinated facts.
 
 **Free trial:** 1 resume upload + 1 JD run → full visible output.
 **All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$9.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
@@ -30,30 +30,56 @@ resume-builder/
 │       │   ├── router.py            # Registers all v1 routers
 │       │   └── v1/
 │       │       ├── auth.py          # /auth/* — register, login, refresh, logout, me
-│       │       ├── resumes.py       # /resumes — upload + list
-│       │       ├── runs.py          # /runs — create, get, stream (SSE)
-│       │       ├── exports.py       # /exports — TXT/DOCX/PDF post-payment
+│       │       ├── resumes.py       # /resumes — upload + list (extracts DOCX style on upload)
+│       │       ├── runs.py          # /runs — create, get, stream, variant generate
+│       │       ├── exports.py       # /exports — TXT/DOCX/PDF post-payment (DOCX uses style_metadata)
+│       │       ├── score.py         # /score/preview — pre-run fit score (no full pipeline needed)
 │       │       ├── billing.py       # /billing/* — stripe checkout, crypto invoice, status
 │       │       ├── health.py        # /health — liveness probe
 │       │       └── webhooks/
 │       │           ├── stripe.py    # POST /webhooks/stripe
 │       │           └── crypto.py    # POST /webhooks/crypto
 │       ├── services/
-│       │   └── run_executor.py      # Background task: runs the LangGraph agent
+│       │   ├── run_executor.py      # Background task: runs the LangGraph agent
+│       │   └── run_editor.py        # select_variant, update_section_override, generate_variant
 │       └── ui/
-│           ├── app.py               # NiceGUI pages (mounted at /app)
-│           └── auth_guard.py        # NiceGUI session/cookie check
+│           └── app.py               # NiceGUI single-page app (scores + 3 variant tabs + fit panel)
 │
 ├── packages/
 │   ├── agent/
 │   │   ├── state.py                 # AgentState TypedDict + helper functions
-│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring
+│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring (7 nodes)
 │   │   ├── checkpointer.py          # get_checkpointer() — AsyncPostgresSaver context mgr
-│   │   └── nodes/
-│   │       ├── prepare_inputs.py    # Node 1: parse PDF, extract keywords, ATS score
-│   │       ├── rewrite_sections.py  # Node 2: HF LLM rewrite (primary call)
-│   │       ├── validate_output.py   # Node 3: HF LLM hallucination check (secondary call)
-│   │       └── format_output.py     # Node 4: build final_output dict + plain text
+│   │   ├── nodes/
+│   │   │   ├── prepare_inputs.py    # Node 1: parse resume, extract structured data
+│   │   │   ├── understand_resume.py # Node 2: LLM resume structure analysis
+│   │   │   ├── analyze_inputs.py    # Node 3: LLM JD analysis + before-score
+│   │   │   ├── rewrite_sections.py  # Node 4: LLM rewrite with JD language mirroring
+│   │   │   ├── validate_output.py   # Node 5: hallucination check
+│   │   │   ├── format_output.py     # Node 6: build final_output, before/after scores (no LLM)
+│   │   │   └── assess_fit.py        # Node 7: LLM holistic verdict + coaching bullets
+│   │   ├── analysts/
+│   │   │   ├── jd_analyst.py        # JD structured extraction
+│   │   │   ├── resume_analyst.py    # Resume requirement mapping
+│   │   │   ├── input_analyst.py     # Combined analyze_inputs_combined()
+│   │   │   └── fit_analyst.py       # assess_fit() — verdict + 4-6 coaching bullets
+│   │   ├── providers/               # LLM provider abstraction (5 providers)
+│   │   │   ├── base.py              # AgentTask enum, LLMProvider ABC
+│   │   │   ├── anthropic_provider.py  # claude-opus-4-8 (all tasks)
+│   │   │   ├── openai_provider.py     # gpt-4o (rewrite), gpt-4o-mini (analysis)
+│   │   │   ├── gemini_provider.py     # gemini-3.5-flash (all tasks)
+│   │   │   ├── grok_provider.py       # grok-4.3 (all tasks)
+│   │   │   └── huggingface_provider.py # Llama-3.3-70B-Instruct (all tasks)
+│   │   ├── schemas/
+│   │   │   ├── fit_assessment.py    # FitAssessment(verdict, coaching_bullets)
+│   │   │   ├── analysis.py          # JDAnalysis, ResumeAnalysis
+│   │   │   ├── match.py             # MatchScoreResult, MatchComponentScore
+│   │   │   └── variants.py          # VariantName enum: conservative/balanced/bold
+│   │   ├── scoring/
+│   │   │   └── match_score.py       # Deterministic 5-component weighted score (0-100)
+│   │   └── sections/
+│   │       ├── agent.py             # rewrite_section() — JD-language-mirroring prompt
+│   │       └── orchestrator.py      # build_all_variants(), _variants_to_build()
 │   │
 │   ├── core/
 │   │   ├── access/
@@ -83,8 +109,9 @@ resume-builder/
 │   │       └── export.py            # Export (tracks generated file + S3 key)
 │   │
 │   ├── export/
-│   │   ├── pdf_ingest.py            # pdfplumber resume text extractor
-│   │   └── docx_export.py           # python-docx resume export
+│   │   ├── pdf_ingest.py            # pdfplumber / docx text extractor
+│   │   ├── docx_export.py           # Professional DOCX export (section headers, bullets, style_metadata)
+│   │   └── style_extractor.py       # Extract font/size/spacing from uploaded DOCX
 │   │
 │   └── integrations/
 │       ├── hf_inference.py          # HF Inference API client (rewrite + validate nodes)
@@ -95,7 +122,9 @@ resume-builder/
 │
 ├── migrations/
 │   └── versions/
-│       └── 001_initial_schema.py    # Alembic migration — all tables
+│       ├── 001_initial_schema.py    # All initial tables
+│       ├── 002_llm_provider.py      # Add llm_provider to agent_runs
+│       └── 003_resume_style_metadata.py  # Add style_metadata JSONB to master_resumes
 │
 ├── tests/
 │   ├── conftest.py                  # SQLite in-memory engine, session fixture
@@ -320,42 +349,54 @@ class AccessService:
 
 ---
 
-## 6. LangGraph Agent — 4 Nodes Only
+## 6. LangGraph Agent — 7 Nodes
 
 `packages/agent/graph.py`
 
 ```
-prepare_inputs ──→ rewrite_sections ──→ validate_output ──→ format_output ──→ END
-      │                                        │ (retry_count < 2, not passed)
-      │ (fatal_error)                          └──→ rewrite_sections
-      └──→ END                                 │ (retry_count >= 2, not passed)
-                                               └──→ END
+prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ rewrite_sections
+      │                   │                    │                    │
+      │ (fatal_error)     │ (fatal_error)       │ (fatal_error)      ▼
+      └──→ END            └──→ END              └──→ END       validate_output
+                                                                     │
+                                              ┌──────────────────────┤ (retry_count < 2, not passed)
+                                              ▼                      └──→ rewrite_sections
+                                         format_output ──→ assess_fit ──→ END
 ```
 
+**Node responsibilities:**
+| Node | LLM? | Output |
+|------|------|--------|
+| `prepare_inputs` | No | Parses resume text, splits sections |
+| `understand_resume` | Yes | `resume_structure` — section map + inferred seniority |
+| `analyze_inputs` | Yes | `jd_analysis`, `resume_analysis`, `match_score_before` |
+| `rewrite_sections` | Yes | `variants` dict keyed by selected variant name |
+| `validate_output` | Yes | `validation_passed`, `validation_errors` |
+| `format_output` | No | `final_output` — all scores, plain_text, variant payloads |
+| `assess_fit` | Yes | `final_output.fit_assessment` — verdict + coaching bullets |
+
 **Firm constraints:**
-- Exactly **2 HF calls per run**: `rewrite_sections` (Mistral-Small-3.1-24B) + `validate_output` (Llama-3.1-8B)
 - `prepare_inputs` and `format_output` are **pure Python — no LLM**
 - Max retry loop: `retry_count < 2` in `_after_validate()`
-- Claude is a **fallback only** — same node, triggers when HF returns 4xx/5xx
+- `assess_fit` runs **after** `format_output` — never inside it (format_output re-runs on section edits)
+- `_variants_to_build()` returns **only the selected variant** — other variants are on-demand via `POST /runs/{run_id}/variants/{name}/generate`
 
 ### Key function signatures
 
 ```python
 # packages/agent/graph.py
 def build_graph(
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledGraph: ...
 
 async def run_agent(
     initial: AgentState,
-    llm_complete: LLMComplete,
+    agent_service: AgentService,
+    on_progress: ProgressCallback | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> AgentState: ...
-
-# LLMComplete callable type
-LLMComplete = Callable[..., Awaitable[str]]
-# called as: await llm_complete(model="...", prompt="...", node="rewrite_sections")
 ```
 
 ### Checkpointer wiring
@@ -369,8 +410,36 @@ async def get_checkpointer(database_url: str) -> AsyncGenerator[AsyncPostgresSav
 
 # Usage in run_executor.py
 async with get_checkpointer(settings.database_url) as checkpointer:
-    result = await run_agent(initial, llm_complete, checkpointer=checkpointer)
+    result = await run_agent(initial, agent_service, checkpointer=checkpointer)
 ```
+
+### LLM Providers
+
+5 providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes.
+
+| Provider | Model used |
+|----------|-----------|
+| Anthropic | `claude-opus-4-8` (all tasks) |
+| OpenAI | `gpt-4o` (SECTION_REWRITE), `gpt-4o-mini` (all others) |
+| Gemini | `gemini-3.5-flash` (all tasks) |
+| Grok | `grok-4.3` (all tasks) |
+| HuggingFace | `meta-llama/Llama-3.3-70B-Instruct` (all tasks) |
+
+`AgentTask` enum members: `RESUME_ORCHESTRATION`, `INPUT_ANALYSIS`, `JD_ANALYSIS`, `RESUME_ANALYSIS`, `SECTION_REWRITE`, `VALIDATION`, `FIT_ASSESSMENT`. **All providers must map every task.**
+
+### Scoring
+
+`packages/agent/scoring/match_score.py` — deterministic 5-component weighted score:
+
+| Component | Weight | What it measures |
+|-----------|--------|-----------------|
+| `must_have` | 35% | Requirement evidence (met/partial/missing) |
+| `skills` | 20% | JD skills vs resume skills |
+| `experience_relevance` | 20% | Role/industry overlap |
+| `ats_keywords` | 15% | JD keyword coverage |
+| `seniority_fit` | 10% | Seniority level match |
+
+**Fit verdict thresholds (LLM-confirmed):** Strong fit ≥72 and no unmet dealbreakers; Not a fit <45 or dealbreaker unmet; Moderate fit otherwise.
 
 ---
 
@@ -450,6 +519,7 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **Merged PR #2** |
 | `feature/nicegui-paywall-polish` | Device fingerprint auth, single-page SSE UX, post-payment polling, export gating | **Merged PR #3** |
+| `fix/resume-generation-quality` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **PR open — 2026-06-28** |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, `verify_docs` in CI | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
@@ -463,9 +533,12 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 - Run Alembic migrations on app startup — `migrate` is a separate Docker service
 - Store JWTs anywhere except httpOnly cookies
 - Return `AgentRun.final_output` when `AgentRun.output_locked = True`
-- Add LLM calls to `prepare_inputs` or `format_output` nodes
-- Add a 5th LangGraph node without updating the architecture plan
+- Add LLM calls to `prepare_inputs` or `format_output` nodes — `format_output` re-runs on every section edit; LLM coaching goes in `assess_fit` only
+- Add a new LangGraph node without updating this document's §6 and the architecture plan
+- Add a new `AgentTask` without adding it to **all 5 provider** `_TASK_MODELS` dicts
+- Invent employer names, dates, degrees, certifications, titles, or metrics in rewrite prompts
 - Commit `.env` or any secret file
 - Merge `docs/dev/` into `main`
 - Write a migration without updating `docs/database/tables/{table_name}.md`
 - Use `git push --force` on shared branches
+- Create a dashboard page — the app is single-page only; checkout stays as a popup dialog

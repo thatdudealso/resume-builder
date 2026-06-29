@@ -7,13 +7,16 @@ from packages.agent.providers._mock import mock_complete
 from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.providers import LLMProviderName
 
+GEMINI_FLASH_MODEL = "gemini-3.5-flash"
+
 _TASK_MODELS: dict[AgentTask, str] = {
-    AgentTask.RESUME_ORCHESTRATION: "gemini-2.0-flash-lite",
-    AgentTask.INPUT_ANALYSIS: "gemini-2.0-flash-lite",
-    AgentTask.JD_ANALYSIS: "gemini-2.0-flash-lite",
-    AgentTask.RESUME_ANALYSIS: "gemini-2.0-flash-lite",
-    AgentTask.SECTION_REWRITE: "gemini-2.0-flash-lite",
-    AgentTask.VALIDATION: "gemini-2.0-flash-lite",
+    AgentTask.RESUME_ORCHESTRATION: GEMINI_FLASH_MODEL,
+    AgentTask.INPUT_ANALYSIS: GEMINI_FLASH_MODEL,
+    AgentTask.JD_ANALYSIS: GEMINI_FLASH_MODEL,
+    AgentTask.RESUME_ANALYSIS: GEMINI_FLASH_MODEL,
+    AgentTask.SECTION_REWRITE: GEMINI_FLASH_MODEL,
+    AgentTask.VALIDATION: GEMINI_FLASH_MODEL,
+    AgentTask.FIT_ASSESSMENT: GEMINI_FLASH_MODEL,
 }
 
 

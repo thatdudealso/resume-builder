@@ -21,6 +21,7 @@ class MasterResume(Base):
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     structured_json: Mapped[dict | None] = mapped_column(JsonType)
+    style_metadata: Mapped[dict | None] = mapped_column(JsonType)
     is_free_trial_resume: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

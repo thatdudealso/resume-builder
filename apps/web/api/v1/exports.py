@@ -11,6 +11,7 @@ from apps.web.dependencies import get_current_user, get_db
 from packages.core.access.service import AccessService
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.export import Export
+from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
 from packages.export.docx_export import export_docx, export_txt
 from packages.export.pdf_export import export_pdf
@@ -48,7 +49,9 @@ async def create_export(
         data = export_txt(plain)
         content_type = "text/plain"
     elif body.format == "docx":
-        data = export_docx(plain)
+        resume = await session.get(MasterResume, run.master_resume_id)
+        style_meta = resume.style_metadata if resume else None
+        data = export_docx(plain, style_metadata=style_meta)
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     else:
         data = export_pdf(plain)
