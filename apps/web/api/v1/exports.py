@@ -11,10 +11,11 @@ from apps.web.dependencies import get_current_user, get_db
 from packages.core.access.service import AccessService
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.export import Export
+from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
 from packages.export.docx_export import export_docx, export_txt
 from packages.export.pdf_export import export_pdf
-from packages.integrations.s3_storage import presigned_url, upload_bytes
+from packages.integrations.s3_storage import download_bytes, presigned_url, upload_bytes
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
@@ -42,16 +43,32 @@ async def create_export(
         raise HTTPException(status_code=402, detail="Free trial allows TXT export only")
     if not run.is_free_trial_run and body.format == "txt":
         pass
+    resume = await session.get(MasterResume, run.master_resume_id)
+    original_bytes = None
+    if resume is not None:
+        try:
+            original_bytes = download_bytes(resume.s3_key)
+        except Exception:
+            original_bytes = None
     output = run.final_output or {}
     plain = output.get("plain_text", "")
     if body.format == "txt":
         data = export_txt(plain)
         content_type = "text/plain"
     elif body.format == "docx":
-        data = export_docx(plain)
+        template_bytes = (
+            original_bytes
+            if resume is not None and resume.filename.lower().endswith(".docx")
+            else None
+        )
+        data = export_docx(plain, template_bytes=template_bytes)
         content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     else:
-        data = export_pdf(plain)
+        data = export_pdf(
+            plain,
+            original_filename=resume.filename if resume is not None else None,
+            original_bytes=original_bytes,
+        )
         content_type = "application/pdf"
     key = f"exports/{user.id}/{run.id}/{uuid.uuid4()}.{body.format}"
     upload_bytes(key, data, content_type)

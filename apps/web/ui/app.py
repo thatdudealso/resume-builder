@@ -46,6 +46,13 @@ def _request() -> Any:
     return request_contextvar.get()
 
 
+def _request_base_url() -> str:
+    request = _request()
+    if request is None:
+        return "http://127.0.0.1:8000"
+    return str(request.base_url).rstrip("/")
+
+
 def _format_detail(response_text: str, fallback: str) -> str:
     try:
         data = json.loads(response_text)
@@ -452,7 +459,10 @@ def index_page() -> None:
         async with api_client() as client:
             response = await client.post("/api/v1/exports", json={"run_id": run_id, "format": fmt})
         if response.status_code == 200:
-            ui.navigate.to(response.json()["download_url"], new_tab=True)
+            download_url = response.json()["download_url"]
+            if download_url.startswith("/"):
+                download_url = f"{_request_base_url()}{download_url}"
+            ui.navigate.to(download_url, new_tab=True)
             payment_status.set_text(f"{fmt.upper()} export ready.")
             return
         payment_status.set_text(_format_detail(response.text, "Export failed"))
