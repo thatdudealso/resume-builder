@@ -86,6 +86,9 @@ def _normalize_structure(data: dict[str, object], resume_text: str) -> ResumeStr
             sources.setdefault(key, sources.get(key, "orchestrator"))
 
     present = [key for key in SECTION_KEYS if sections.get(key)]
+    if not present:
+        return _fallback_structure(resume_text)
+
     suggested = [
         item
         for item in structure.sections_suggested

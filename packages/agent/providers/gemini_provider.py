@@ -48,7 +48,11 @@ class GeminiProvider(LLMProvider):
         }
         async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(url, json=payload)
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                message = f"Gemini request failed with status {exc.response.status_code}"
+                raise RuntimeError(message) from None
             data = resp.json()
 
         candidates = data.get("candidates") or []

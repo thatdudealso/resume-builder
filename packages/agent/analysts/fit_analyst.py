@@ -4,7 +4,8 @@ from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.fit_assessment import FitAssessment
 from packages.agent.utils.json_parse import parse_json_response
 
-_FIT_ASSESSMENT_PROMPT = """You are a career coach reviewing a tailored resume against a job description.
+_FIT_ASSESSMENT_PROMPT = """You are a career coach reviewing a tailored resume against a job
+description.
 Structured analysis is already done — synthesise a verdict and actionable coaching bullets.
 
 JD must-have requirements: {must_have}

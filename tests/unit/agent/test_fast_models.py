@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import pytest
-
-from packages.agent.providers.anthropic_provider import AnthropicProvider
+from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL, AnthropicProvider
 from packages.agent.providers.base import AgentTask
-from packages.agent.providers.gemini_provider import GeminiProvider
-from packages.agent.providers.grok_provider import GrokProvider
+from packages.agent.providers.gemini_provider import GEMINI_FLASH_MODEL, GeminiProvider
+from packages.agent.providers.grok_provider import GROK_MODEL, GrokProvider
 from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
 
@@ -29,14 +27,21 @@ def _analysis_uses_fast_model(provider_cls, fast_model: str) -> None:
 
 
 def test_all_providers_cover_all_tasks():
-    for cls in [AnthropicProvider, OpenAIProvider, GeminiProvider, GrokProvider, HuggingFaceProvider]:
+    providers = [
+        AnthropicProvider,
+        OpenAIProvider,
+        GeminiProvider,
+        GrokProvider,
+        HuggingFaceProvider,
+    ]
+    for cls in providers:
         _all_tasks_have_models(cls)
 
 
 def test_anthropic_uses_opus():
     provider = AnthropicProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "claude-opus-4-8"
+        assert provider.model_for_task(task) == ANTHROPIC_OPUS_MODEL
 
 
 def test_openai_model_tiers():
@@ -47,13 +52,13 @@ def test_openai_model_tiers():
 def test_gemini_uses_flash():
     provider = GeminiProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "gemini-3.5-flash"
+        assert provider.model_for_task(task) == GEMINI_FLASH_MODEL
 
 
 def test_grok_uses_latest():
     provider = GrokProvider()
     for task in AgentTask:
-        assert provider.model_for_task(task) == "grok-4.3"
+        assert provider.model_for_task(task) == GROK_MODEL
 
 
 def test_huggingface_uses_latest_llama():

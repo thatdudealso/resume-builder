@@ -275,7 +275,10 @@ async def generate_run_variant(
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Run not found")
     if run.status != "completed":
-        raise HTTPException(status_code=400, detail="Run must be completed before generating variants")
+        raise HTTPException(
+            status_code=400,
+            detail="Run must be completed before generating variants",
+        )
     resume = await session.get(MasterResume, run.master_resume_id)
     if resume is None:
         raise HTTPException(status_code=404, detail="Resume not found")

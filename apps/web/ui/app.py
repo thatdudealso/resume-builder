@@ -26,7 +26,9 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
-from packages.agent.schemas.variants import DEFAULT_VARIANT, VARIANT_LABELS, VariantName, variant_option_labels
+from packages.agent.schemas.variants import (
+    DEFAULT_VARIANT,
+)
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -295,17 +297,24 @@ def index_page() -> None:
                             score_after_num = ui.label("—").classes("rb-score-num")
 
                     # Variant tabs
-                    with ui.card().classes("w-full p-0").style("border:1px solid var(--rb-line);border-radius:10px;overflow:hidden;"):
+                    with ui.card().classes("w-full p-0").style(
+                        "border:1px solid var(--rb-line);"
+                        "border-radius:10px;"
+                        "overflow:hidden;"
+                    ):
                         with ui.tabs().classes("w-full") as variant_tabs:
-                            tab_conservative = ui.tab("conservative", label="Light touch", icon="tune")
-                            tab_balanced = ui.tab("balanced", label="Standard fit", icon="balance")
-                            tab_bold = ui.tab("bold", label="Bold match", icon="bolt")
+                            ui.tab("conservative", label="Light touch", icon="tune")
+                            ui.tab("balanced", label="Standard fit", icon="balance")
+                            ui.tab("bold", label="Bold match", icon="bolt")
 
-                        with ui.tab_panels(variant_tabs, value=DEFAULT_VARIANT.value).classes("w-full p-0"):
+                        with ui.tab_panels(variant_tabs, value=DEFAULT_VARIANT.value).classes(
+                            "w-full p-0"
+                        ):
                             # Conservative tab
                             with ui.tab_panel("conservative").classes("p-4"):
                                 conservative_output = ui.markdown(
-                                    "_Generate the Light Touch variant after the main run completes._"
+                                    "_Generate the Light Touch variant after the main "
+                                    "run completes._"
                                 ).classes("rb-output w-full")
                                 conservative_gen_row = ui.row().classes("gap-2 items-center hidden")
                                 with conservative_gen_row:
@@ -317,7 +326,8 @@ def index_page() -> None:
                             # Balanced tab (default)
                             with ui.tab_panel("balanced").classes("p-4"):
                                 balanced_output = ui.markdown(
-                                    "Upload a resume, paste a job description, then start a tailored run."
+                                    "Upload a resume, paste a job description, then "
+                                    "start a tailored run."
                                 ).classes("rb-output w-full")
                                 balanced_gen_row = ui.row().classes("gap-2 items-center hidden")
                                 with balanced_gen_row:
@@ -329,7 +339,8 @@ def index_page() -> None:
                             # Bold tab
                             with ui.tab_panel("bold").classes("p-4"):
                                 bold_output = ui.markdown(
-                                    "_Generate the Bold Match variant after the main run completes._"
+                                    "_Generate the Bold Match variant after the main "
+                                    "run completes._"
                                 ).classes("rb-output w-full")
                                 bold_gen_row = ui.row().classes("gap-2 items-center hidden")
                                 with bold_gen_row:
@@ -515,15 +526,18 @@ def index_page() -> None:
 
     def _display_variants(final_output: dict) -> None:
         variants = final_output.get("variants") or {}
-        selected = final_output.get("selected_variant") or DEFAULT_VARIANT.value
 
-        for vname, (output_md, (gen_row, gen_btn, gen_status)) in zip(
+        variant_widgets = [
+            (
+                conservative_output,
+                (conservative_gen_row, conservative_gen_btn, conservative_gen_status),
+            ),
+            (balanced_output, (balanced_gen_row, balanced_gen_btn, balanced_gen_status)),
+            (bold_output, (bold_gen_row, bold_gen_btn, bold_gen_status)),
+        ]
+        for vname, (output_md, (gen_row, _gen_btn, _gen_status)) in zip(
             ["conservative", "balanced", "bold"],
-            [
-                (conservative_output, (conservative_gen_row, conservative_gen_btn, conservative_gen_status)),
-                (balanced_output, (balanced_gen_row, balanced_gen_btn, balanced_gen_status)),
-                (bold_output, (bold_gen_row, bold_gen_btn, bold_gen_status)),
-            ],
+            variant_widgets,
         ):
             if vname in variants:
                 plain = variants[vname].get("plain_text") or ""
@@ -575,7 +589,7 @@ def index_page() -> None:
                 f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}"
             )
             payment_status.set_text("Payment required to reveal the full tailored resume.")
-            if show_paywall:
+            if show_paywall or body.get("status") == "completed":
                 paywall_dialog.open()
             return body
 
@@ -608,8 +622,12 @@ def index_page() -> None:
             docx_btn = ui.button("DOCX", icon="article", on_click=lambda: do_export("docx")).props(
                 "flat"
             )
-            pdf_btn = ui.button("PDF", icon="picture_as_pdf", on_click=lambda: do_export("pdf")).props(
-                "flat"
+            pdf_btn = ui.button(
+                "PDF",
+                icon="picture_as_pdf",
+                on_click=lambda: do_export("pdf"),
+            ).props(
+                "flat",
             )
             if body.get("is_free_trial_run"):
                 docx_btn.props("disable")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -23,6 +24,52 @@ async def test_free_trial_run_access(session):
     await session.flush()
     decision2 = await access.can_start_run(user.id)
     assert decision2.mode == RunAccessMode.LOCKED
+
+
+@pytest.mark.asyncio
+async def test_active_payment_window_allows_paid_run(session):
+    user = await register_user(session, "active-window@example.com", "password123")
+    user.free_trial_used = True
+    session.add(
+        Payment(
+            user_id=user.id,
+            provider="stripe",
+            provider_payment_id="pi_active_window",
+            idempotency_key="active-window",
+            amount_usd=Decimal("9.99"),
+            status="confirmed",
+            confirmed_at=datetime.now(UTC) - timedelta(hours=23, minutes=59),
+        )
+    )
+    await session.flush()
+
+    access = AccessService(session)
+    decision = await access.can_start_run(user.id)
+
+    assert decision.mode == RunAccessMode.PAID
+
+
+@pytest.mark.asyncio
+async def test_expired_payment_window_requires_new_payment(session):
+    user = await register_user(session, "expired-window@example.com", "password123")
+    user.free_trial_used = True
+    session.add(
+        Payment(
+            user_id=user.id,
+            provider="stripe",
+            provider_payment_id="pi_expired_window",
+            idempotency_key="expired-window",
+            amount_usd=Decimal("9.99"),
+            status="confirmed",
+            confirmed_at=datetime.now(UTC) - timedelta(hours=24, seconds=1),
+        )
+    )
+    await session.flush()
+
+    access = AccessService(session)
+    decision = await access.can_start_run(user.id)
+
+    assert decision.mode == RunAccessMode.LOCKED
 
 
 @pytest.mark.asyncio
