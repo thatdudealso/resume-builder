@@ -161,7 +161,8 @@ async def generate_variant(
     if variant_name in variants:
         ms = variants[variant_name].get("match_score") or {}
         overall = ms.get("overall")
-        if overall is not None:
+        canonical = final.get("selected_variant") or DEFAULT_VARIANT.value
+        if overall is not None and variant_name == canonical:
             run.ats_score_after = Decimal(str(overall))
     await session.commit()
     return {"final_output": final}

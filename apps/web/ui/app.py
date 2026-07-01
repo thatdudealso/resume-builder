@@ -26,9 +26,7 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
-from packages.agent.schemas.variants import (
-    DEFAULT_VARIANT,
-)
+from packages.agent.schemas.variants import DEFAULT_VARIANT
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -231,6 +229,8 @@ def index_page() -> None:
         "payment_id": None,
         "poll_payment": paid_return,
         "before_score_task": None,
+        "cached_before_jd": None,
+        "cached_before_score": None,
     }
 
     with ui.column().classes("rb-page"):
@@ -420,6 +420,9 @@ def index_page() -> None:
         state["stripe_configured"] = billing.get("stripe_configured", False)
         if not state["stripe_configured"]:
             stripe_button.props("disable")
+            crypto_status.set_text(
+                "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+            )
         else:
             stripe_button.props(remove="disable")
             if not state.get("poll_payment"):
@@ -459,6 +462,8 @@ def index_page() -> None:
         jd_text = (jd_input.value or "").strip()
         if not resume_id or len(jd_text) < 20:
             return
+        if state.get("cached_before_jd") == jd_text:
+            return
         provider = provider_select.value or "huggingface"
         async with api_client() as client:
             resp = await client.post(
@@ -473,6 +478,7 @@ def index_page() -> None:
                 before_score_sub.set_text("out of 100 — before tailoring")
                 before_card.classes(remove="hidden")
                 state["cached_before_score"] = overall
+                state["cached_before_jd"] = jd_text
 
     async def schedule_before_score() -> None:
         task = state.get("before_score_task")
@@ -511,6 +517,8 @@ def index_page() -> None:
         if response.status_code == 200:
             data = response.json()
             state["resume_id"] = data["resume_id"]
+            state["cached_before_jd"] = None
+            state["cached_before_score"] = None
             resume_label.set_text(f"Resume: {data['filename']}")
             upload_status.set_text("Resume uploaded.")
             upload_status.classes(remove="rb-danger")
@@ -526,19 +534,8 @@ def index_page() -> None:
 
     def _display_variants(final_output: dict) -> None:
         variants = final_output.get("variants") or {}
-
-        variant_widgets = [
-            (
-                conservative_output,
-                (conservative_gen_row, conservative_gen_btn, conservative_gen_status),
-            ),
-            (balanced_output, (balanced_gen_row, balanced_gen_btn, balanced_gen_status)),
-            (bold_output, (bold_gen_row, bold_gen_btn, bold_gen_status)),
-        ]
-        for vname, (output_md, (gen_row, _gen_btn, _gen_status)) in zip(
-            ["conservative", "balanced", "bold"],
-            variant_widgets,
-        ):
+        for vname, output_md in _variant_outputs.items():
+            gen_row, _gen_btn, _gen_status = _variant_gen_rows[vname]
             if vname in variants:
                 plain = variants[vname].get("plain_text") or ""
                 output_md.set_content(plain)

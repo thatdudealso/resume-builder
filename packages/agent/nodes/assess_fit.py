@@ -19,10 +19,18 @@ async def assess_fit(
         await on_progress({"event": "node_start", "node": "assess_fit"})
 
     final_output = dict(state.get("final_output") or {})
+
+    match_score = final_output.get("match_score")
+    if not match_score:
+        # format_output stores a flat dict in state["match_score_after"];
+        # fit_analyst expects {"current": {...}, "previous": {...}}
+        flat = state.get("match_score_after") or {}
+        match_score = {"current": flat, "previous": state.get("match_score_before") or {}}
+
     fit = await agent_service.assess_fit(
         final_output.get("jd_analysis") or state.get("jd_analysis") or {},
         final_output.get("resume_analysis") or state.get("resume_analysis") or {},
-        final_output.get("match_score") or state.get("match_score_after") or {},
+        match_score,
     )
     final_output["fit_assessment"] = fit
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Literal, cast
 
 from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.fit_assessment import FitAssessment
 from packages.agent.utils.json_parse import parse_json_response
+
+logger = logging.getLogger(__name__)
 
 _FIT_ASSESSMENT_PROMPT = """You are a career coach reviewing a tailored resume against a job
 description.
@@ -126,6 +129,6 @@ async def assess_fit(
             data = parse_json_response(raw)
             return FitAssessment.model_validate(data)
         except Exception:
-            pass
+            logger.warning("assess_fit LLM call failed, using heuristic fallback", exc_info=True)
 
     return _fallback(score_after, evidence, dealbreakers)

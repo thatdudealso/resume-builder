@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 
 from docx import Document
-from docx.shared import Pt
 
 
 def extract_docx_styles(data: bytes) -> dict[str, object]:
@@ -12,6 +11,7 @@ def extract_docx_styles(data: bytes) -> dict[str, object]:
 
     fonts: dict[str, int] = {}
     sizes: list[float] = []
+    heading_sizes: list[float] = []
     space_before: list[float] = []
     space_after: list[float] = []
     has_bullets = False
@@ -25,19 +25,26 @@ def extract_docx_styles(data: bytes) -> dict[str, object]:
         style_name = para.style.name if para.style else ""
         if "List" in style_name or "Bullet" in style_name:
             has_bullets = True
+        is_heading_style = "Heading" in style_name
 
         for run in para.runs:
             if run.font.name:
                 fonts[run.font.name] = fonts.get(run.font.name, 0) + 1
             if run.font.size:
                 try:
-                    sizes.append(Pt(run.font.size.pt).pt)
+                    size_pt = run.font.size.pt
                 except Exception:
-                    pass
+                    continue
+                sizes.append(size_pt)
+                if is_heading_style or run.font.bold:
+                    heading_sizes.append(size_pt)
 
     dominant_font = max(fonts, key=lambda k: fonts[k]) if fonts else "Calibri"
     body_size = round(sorted(sizes)[len(sizes) // 2]) if sizes else 11
-    heading_size = max(sizes, default=body_size + 2)
+    # Heading size: smallest bold/heading-styled size that's larger than body text,
+    # capped at body+6pt to exclude title/name lines (typically 14pt+ above body).
+    heading_candidates = [s for s in heading_sizes if body_size < s <= body_size + 6]
+    heading_size = round(min(heading_candidates)) if heading_candidates else body_size + 2
     avg_space_before = round(sum(space_before) / len(space_before)) if space_before else 6
     avg_space_after = round(sum(space_after) / len(space_after)) if space_after else 6
 

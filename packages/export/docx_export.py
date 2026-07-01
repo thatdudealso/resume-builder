@@ -9,7 +9,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 
-_SECTION_HEADERS = {"SUMMARY", "EXPERIENCE", "SKILLS", "EDUCATION"}
+from packages.agent.schemas.variants import SECTION_KEYS
+
+_SECTION_HEADERS = {k.upper() for k in SECTION_KEYS}
 _BULLET_PATTERN = re.compile(r"^(\s*[-•*]\s+)(.*)")
 
 
