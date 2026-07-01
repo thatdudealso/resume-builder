@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from decimal import Decimal
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,7 @@ from packages.agent.schemas.variants import (
     SECTION_KEYS,
     VariantName,
 )
-from packages.agent.sections.orchestrator import retailor_section
+from packages.agent.sections.orchestrator import build_all_variants, retailor_section
 from packages.agent.service import AgentService
 from packages.agent.state import AgentState, split_sections
 from packages.core.security.sanitization import sanitize_text
@@ -110,6 +111,63 @@ async def update_section_override(
     return final
 
 
+async def generate_variant(
+    session: AsyncSession,
+    run: AgentRun,
+    resume: MasterResume,
+    variant_name: str,
+) -> dict[str, Any]:
+    try:
+        VariantName(variant_name)
+    except ValueError as exc:
+        raise ValueError("Invalid variant") from exc
+
+    agent_service = AgentService(run.llm_provider)
+    final = deepcopy(run.final_output or {})
+    original_sections = split_sections(resume.raw_text)
+    header = original_sections.get("header", "")
+
+    state: AgentState = {
+        "master_resume_structured": original_sections,
+        "jd_text": run.jd_text,
+        "jd_analysis": final.get("jd_analysis") or {},
+        "resume_analysis": final.get("resume_analysis") or {},
+        "keyword_gaps": final.get("keywords_used") or [],
+        "selected_variant": variant_name,
+        "sections_to_tailor": list(SECTION_KEYS),
+    }
+
+    new_sections = await build_all_variants(state, agent_service)
+
+    variants = dict(final.get("variants") or {})
+    for vname, sections in new_sections.items():
+        parts = [
+            f"{key.upper()}\n{sections[key]}"
+            for key in SECTION_KEYS
+            if sections.get(key, "").strip()
+        ]
+        plain = "\n\n".join(parts)
+        if header.strip():
+            plain = header.strip() + "\n\n" + plain
+        match_after = agent_service.score_match(
+            final.get("jd_analysis") or {},
+            final.get("resume_analysis") or {},
+            plain,
+        ).model_dump()
+        variants[vname] = {"sections": sections, "plain_text": plain, "match_score": match_after}
+
+    final["variants"] = variants
+    run.final_output = final
+    if variant_name in variants:
+        ms = variants[variant_name].get("match_score") or {}
+        overall = ms.get("overall")
+        canonical = final.get("selected_variant") or DEFAULT_VARIANT.value
+        if overall is not None and variant_name == canonical:
+            run.ats_score_after = Decimal(str(overall))
+    await session.commit()
+    return {"final_output": final}
+
+
 async def add_section_and_retailor(
     session: AsyncSession,
     run: AgentRun,
@@ -160,8 +218,6 @@ async def add_section_and_retailor(
     )
     run.final_output = final
     if final.get("match_score", {}).get("current_overall") is not None:
-        from decimal import Decimal
-
         run.ats_score_after = Decimal(str(final["match_score"]["current_overall"]))
     await session.commit()
     return final

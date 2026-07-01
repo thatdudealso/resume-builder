@@ -11,8 +11,9 @@ _TASK_MODELS: dict[AgentTask, str] = {
     AgentTask.INPUT_ANALYSIS: "gpt-4o-mini",
     AgentTask.JD_ANALYSIS: "gpt-4o-mini",
     AgentTask.RESUME_ANALYSIS: "gpt-4o-mini",
-    AgentTask.SECTION_REWRITE: "gpt-4o-mini",
+    AgentTask.SECTION_REWRITE: "gpt-4o",
     AgentTask.VALIDATION: "gpt-4o-mini",
+    AgentTask.FIT_ASSESSMENT: "gpt-4o-mini",
 }
 
 

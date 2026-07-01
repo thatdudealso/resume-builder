@@ -6,6 +6,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
 from packages.agent.nodes.analyze_inputs import analyze_inputs
+from packages.agent.nodes.assess_fit import assess_fit
 from packages.agent.nodes.format_output import format_output
 from packages.agent.nodes.prepare_inputs import prepare_inputs
 from packages.agent.nodes.rewrite_sections import rewrite_sections
@@ -91,12 +92,16 @@ def build_graph(
             await on_progress({"event": "node_complete", "node": "format_output"})
         return result
 
+    async def assess_fit_node(state: AgentState) -> AgentState:
+        return await assess_fit(state, agent_service, on_progress)
+
     graph.add_node("prepare_inputs", prep_node)
     graph.add_node("understand_resume", understand_node)
     graph.add_node("analyze_inputs", analyze_node)
     graph.add_node("rewrite_sections", rewrite_node)
     graph.add_node("validate_output", validate_node)
     graph.add_node("format_output", format_node)
+    graph.add_node("assess_fit", assess_fit_node)
     graph.set_entry_point("prepare_inputs")
     graph.add_conditional_edges(
         "prepare_inputs",
@@ -122,7 +127,8 @@ def build_graph(
             "rewrite_sections": "rewrite_sections",
         },
     )
-    graph.add_edge("format_output", END)
+    graph.add_edge("format_output", "assess_fit")
+    graph.add_edge("assess_fit", END)
     return graph.compile(checkpointer=checkpointer)
 
 

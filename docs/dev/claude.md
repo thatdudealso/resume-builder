@@ -7,7 +7,7 @@
 
 ## 1. What This App Does
 
-Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, and gets a rewritten resume with job-description keywords injected — no hallucinated facts. The user can also pick a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok/HuggingFace) before running.
+Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, picks a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok/HuggingFace), then gets three tailored resume variations with JD-mirrored language, before/after job-fit scores, and LLM coaching bullets. No hallucinated facts.
 
 **Free trial:** 1 resume upload + 1 JD run → full visible output.
 **All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$3.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
@@ -30,9 +30,10 @@ resume-builder/
 │       │   ├── router.py            # Registers all v1 routers
 │       │   └── v1/
 │       │       ├── auth.py          # /auth/* — register, login, refresh, logout, me
-│       │       ├── resumes.py       # /resumes — upload + list
-│       │       ├── runs.py          # /runs — create, get, stream (SSE)
-│       │       ├── exports.py       # /exports — TXT/DOCX/PDF post-payment
+│       │       ├── resumes.py       # /resumes — upload + list (extracts DOCX style on upload)
+│       │       ├── runs.py          # /runs — create, get, stream, variant generate
+│       │       ├── exports.py       # /exports — TXT/DOCX/PDF post-payment (DOCX uses style_metadata)
+│       │       ├── score.py         # /score/preview — pre-run fit score (no full pipeline needed)
 │       │       ├── billing.py       # /billing/* — stripe checkout, crypto invoice, status
 │       │       ├── health.py        # /health — liveness probe
 │       │       └── webhooks/
@@ -41,51 +42,59 @@ resume-builder/
 │       ├── services/
 │       │   ├── run_executor.py      # execute_run_background() — runs the LangGraph agent
 │       │   ├── run_launcher.py      # create_and_schedule_run() — creates run + schedules execution as a task
-│       │   ├── run_editor.py        # post-run section edits/retailor, used by PATCH /runs/{id}/sections/*
+│       │   ├── run_editor.py        # select_variant, update_section_override, generate_variant
 │       │   └── stripe_billing.py    # checkout session creation + /billing/stripe/verify polling fallback
 │       └── ui/
-│           ├── app.py               # NiceGUI home page at /app/ — primary upload+tailor+pay workflow
-│           ├── dashboard.py         # NiceGUI page at /app/dashboard — advanced/duplicate workflow with score cards
+│           ├── app.py               # NiceGUI single-page app (scores + 3 variant tabs + fit panel)
 │           ├── auth_guard.py        # NiceGUI session/cookie check
 │           ├── request_auth.py      # device-fingerprint-based request auth for UI → API calls
-│           ├── run_progress.py      # SSE-style progress watcher used by both app.py and dashboard.py
+│           ├── run_progress.py      # SSE-style progress watcher
 │           ├── workflow_session.py  # persists run/resume/JD state in browser storage across Stripe redirect
 │           └── console_log.py       # browser console logging helper
 │
 ├── packages/
 │   ├── agent/
 │   │   ├── state.py                 # AgentState TypedDict + helper functions
-│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring (6 nodes)
+│   │   ├── graph.py                 # build_graph(), run_agent() — LangGraph wiring (7 nodes)
 │   │   ├── service.py               # AgentService — wraps the selected LLMProvider for all nodes
 │   │   ├── checkpointer.py          # get_checkpointer() — AsyncPostgresSaver context mgr
 │   │   ├── nodes/
-│   │   │   ├── prepare_inputs.py    # Node 1: parse resume, extract keywords, ATS score (no LLM)
-│   │   │   ├── understand_resume.py # Node 2: LLM — structure resume into sections
-│   │   │   ├── analyze_inputs.py    # Node 3: LLM — combined JD+resume analysis (1 call, was 2)
-│   │   │   ├── rewrite_sections.py  # Node 4: LLM — rewrite for the selected tailoring variant
-│   │   │   ├── validate_output.py   # Node 5: LLM — hallucination check
-│   │   │   └── format_output.py     # Node 6: build final_output dict + plain text (no LLM)
+│   │   │   ├── prepare_inputs.py    # Node 1: parse resume, extract structured data
+│   │   │   ├── understand_resume.py # Node 2: LLM resume structure analysis
+│   │   │   ├── analyze_inputs.py    # Node 3: LLM JD analysis + before-score
+│   │   │   ├── rewrite_sections.py  # Node 4: LLM rewrite with JD language mirroring
+│   │   │   ├── validate_output.py   # Node 5: hallucination check
+│   │   │   ├── format_output.py     # Node 6: build final_output, before/after scores (no LLM)
+│   │   │   └── assess_fit.py        # Node 7: LLM holistic verdict + coaching bullets
 │   │   ├── analysts/
-│   │   │   ├── input_analyst.py     # analyze_inputs_combined() — single-call JD+resume analysis
-│   │   │   ├── jd_analyst.py        # legacy sequential JD analysis (fallback path)
-│   │   │   └── resume_analyst.py    # legacy sequential resume analysis (fallback path)
+│   │   │   ├── jd_analyst.py        # JD structured extraction
+│   │   │   ├── resume_analyst.py    # Resume requirement mapping
+│   │   │   ├── input_analyst.py     # Combined analyze_inputs_combined()
+│   │   │   └── fit_analyst.py       # assess_fit() — verdict + 4-6 coaching bullets
 │   │   ├── orchestrator/
 │   │   │   └── resume_orchestrator.py  # understand_resume_structure() for the understand_resume node
-│   │   ├── sections/
-│   │   │   ├── agent.py             # rewrite_section() — per-section LLM call with variant instructions
-│   │   │   └── orchestrator.py      # build_all_variants() — builds 1 (default) or 3 (retailor) variants
-│   │   ├── providers/
-│   │   │   ├── base.py              # LLMProvider protocol
+│   │   ├── providers/               # LLM provider abstraction (5 providers)
+│   │   │   ├── base.py              # AgentTask enum, LLMProvider ABC
 │   │   │   ├── registry.py          # get_provider(), list_provider_options()
-│   │   │   ├── openai_provider.py / anthropic_provider.py / gemini_provider.py / grok_provider.py / huggingface_provider.py
+│   │   │   ├── anthropic_provider.py  # claude-opus-4-8 (all tasks)
+│   │   │   ├── openai_provider.py     # gpt-4o (rewrite), gpt-4o-mini (analysis)
+│   │   │   ├── gemini_provider.py     # gemini-3.5-flash (all tasks)
+│   │   │   ├── grok_provider.py       # grok-4.3 (all tasks)
+│   │   │   ├── huggingface_provider.py # Llama-3.3-70B-Instruct (all tasks)
 │   │   │   └── _http.py, _mock.py   # shared HTTP client + test mock provider
 │   │   ├── schemas/
-│   │   │   ├── variants.py          # VariantName enum (conservative/balanced/bold) + instructions
+│   │   │   ├── fit_assessment.py    # FitAssessment(verdict, coaching_bullets)
+│   │   │   ├── analysis.py          # JDAnalysis, ResumeAnalysis
+│   │   │   ├── match.py             # MatchScoreResult, MatchComponentScore
 │   │   │   ├── providers.py         # LLMProviderName enum + labels
-│   │   │   ├── analysis.py / match.py / resume_structure.py
-│   │   ├── scoring/match_score.py   # ATS-style match scoring (no LLM)
+│   │   │   └── variants.py          # VariantName enum: conservative/balanced/bold
+│   │   ├── scoring/
+│   │   │   └── match_score.py       # Deterministic 5-component weighted score (0-100)
 │   │   ├── changelog/builder.py     # human-readable per-run changelog
-│   │   └── utils/json_parse.py      # tolerant JSON parsing of LLM output
+│   │   ├── utils/json_parse.py      # tolerant JSON parsing of LLM output
+│   │   └── sections/
+│   │       ├── agent.py             # rewrite_section() — JD-language-mirroring prompt
+│   │       └── orchestrator.py      # build_all_variants(), _variants_to_build()
 │   │
 │   ├── core/
 │   │   ├── access/
@@ -115,8 +124,9 @@ resume-builder/
 │   │       └── export.py            # Export (tracks generated file + S3 key)
 │   │
 │   ├── export/
-│   │   ├── pdf_ingest.py            # pdfplumber resume text extractor
-│   │   └── docx_export.py           # python-docx resume export
+│   │   ├── pdf_ingest.py            # pdfplumber / docx text extractor
+│   │   ├── docx_export.py           # Professional DOCX export (section headers, bullets, style_metadata)
+│   │   └── style_extractor.py       # Extract font/size/spacing from uploaded DOCX
 │   │
 │   └── integrations/
 │       ├── hf_inference.py          # HF Inference API client (rewrite + validate nodes)
@@ -127,7 +137,9 @@ resume-builder/
 │
 ├── migrations/
 │   └── versions/
-│       └── 001_initial_schema.py    # Alembic migration — all tables
+│       ├── 001_initial_schema.py    # All initial tables
+│       ├── 002_llm_provider.py      # Add llm_provider to agent_runs
+│       └── 003_resume_style_metadata.py  # Add style_metadata JSONB to master_resumes
 │
 ├── tests/
 │   ├── conftest.py                  # SQLite in-memory engine, session fixture
@@ -372,17 +384,31 @@ class AccessService:
 
 ---
 
-## 6. LangGraph Agent — 6 Nodes
+## 6. LangGraph Agent — 7 Nodes
 
 `packages/agent/graph.py`
 
 ```
-prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ rewrite_sections ──→ validate_output ──→ format_output ──→ END
-      │ (fatal_error)         │ (fatal_error)      │ (fatal_error)                    │ (retry_count < 2, not passed)
-      └──→ END                └──→ END             └──→ END                          └──→ rewrite_sections
-                                                                                        │ (retry_count >= 2, not passed)
-                                                                                        └──→ format_output
+prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ rewrite_sections
+      │                   │                    │                    │
+      │ (fatal_error)     │ (fatal_error)       │ (fatal_error)      ▼
+      └──→ END            └──→ END              └──→ END       validate_output
+                                                                     │
+                                              ┌──────────────────────┤ (retry_count < 2, not passed)
+                                              ▼                      └──→ rewrite_sections
+                                         format_output ──→ assess_fit ──→ END
 ```
+
+**Node responsibilities:**
+| Node | LLM? | Output |
+|------|------|--------|
+| `prepare_inputs` | No | Parses resume text, splits sections |
+| `understand_resume` | Yes | `resume_structure` — section map + inferred seniority |
+| `analyze_inputs` | Yes | `jd_analysis`, `resume_analysis`, `match_score_before` |
+| `rewrite_sections` | Yes | `variants` dict keyed by selected variant name |
+| `validate_output` | Yes | `validation_passed`, `validation_errors` |
+| `format_output` | No | `final_output` — all scores, plain_text, variant payloads |
+| `assess_fit` | Yes | `final_output.fit_assessment` — verdict + coaching bullets |
 
 **Firm constraints:**
 - `prepare_inputs` and `format_output` are **pure Python — no LLM**
@@ -390,6 +416,8 @@ prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ re
 - `analyze_inputs` makes **one combined call** for JD + resume analysis (`analysts/input_analyst.py::analyze_inputs_combined`) — the old two-call sequential path still exists in `jd_analyst.py`/`resume_analyst.py` as a fallback
 - `rewrite_sections` builds only the **selected tailoring variant** by default (`selected_variant`, defaults to `DEFAULT_VARIANT = balanced`); all 3 variants (conservative/balanced/bold) are only built together when retailoring a section after the fact
 - Max retry loop: `retry_count < 2` in `_after_validate()`
+- `assess_fit` runs **after** `format_output` — never inside it (format_output re-runs on section edits)
+- `_variants_to_build()` returns **only the selected variant** — other variants are on-demand via `POST /runs/{run_id}/variants/{name}/generate`
 - All LLM calls go through `AgentService`, which wraps whichever `LLMProvider` was selected (OpenAI/Anthropic/Gemini/Grok/HuggingFace) — there is no single hardcoded model anymore
 
 ### Key function signatures
@@ -421,8 +449,36 @@ async def get_checkpointer(database_url: str) -> AsyncGenerator[AsyncPostgresSav
 
 # Usage in run_executor.py
 async with get_checkpointer(settings.database_url) as checkpointer:
-    result = await run_agent(initial, llm_complete, checkpointer=checkpointer)
+    result = await run_agent(initial, agent_service, checkpointer=checkpointer)
 ```
+
+### LLM Providers
+
+5 providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes.
+
+| Provider | Model used |
+|----------|-----------|
+| Anthropic | `claude-opus-4-8` (all tasks) |
+| OpenAI | `gpt-4o` (SECTION_REWRITE), `gpt-4o-mini` (all others) |
+| Gemini | `gemini-3.5-flash` (all tasks) |
+| Grok | `grok-4.3` (all tasks) |
+| HuggingFace | `meta-llama/Llama-3.3-70B-Instruct` (all tasks) |
+
+`AgentTask` enum members: `RESUME_ORCHESTRATION`, `INPUT_ANALYSIS`, `JD_ANALYSIS`, `RESUME_ANALYSIS`, `SECTION_REWRITE`, `VALIDATION`, `FIT_ASSESSMENT`. **All providers must map every task.**
+
+### Scoring
+
+`packages/agent/scoring/match_score.py` — deterministic 5-component weighted score:
+
+| Component | Weight | What it measures |
+|-----------|--------|-----------------|
+| `must_have` | 35% | Requirement evidence (met/partial/missing) |
+| `skills` | 20% | JD skills vs resume skills |
+| `experience_relevance` | 20% | Role/industry overlap |
+| `ats_keywords` | 15% | JD keyword coverage |
+| `seniority_fit` | 10% | Seniority level match |
+
+**Fit verdict thresholds (LLM-confirmed):** Strong fit ≥72 and no unmet dealbreakers; Not a fit <45 or dealbreaker unmet; Moderate fit otherwise.
 
 ---
 
@@ -502,6 +558,7 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **Merged PR #2** |
 | `feature/nicegui-paywall-polish` | Device fingerprint auth, single-page SSE UX, post-payment polling, export gating | **Merged PR #3** |
+| `fix/resume-generation-quality` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **PR open — 2026-06-28** |
 | `feature/ai-resume-agents` | Multi-provider `AgentService`, section agents, variant schemas | **Merged PR #4** |
 | `feature/ai-resume-ui` | AI resume dashboard (`/app/dashboard`) alongside the single-page workflow | **Merged PR #5** |
 | `feature/stripe-paywall-399` | Repriced unlock from $9.99 to $3.99 | **Merged PR #6** |
@@ -512,6 +569,7 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 | `feature/ui-runtime-fixes` | Upload/progress fixes, Stripe pricing display, Docker fixes | **Merged PR #11** |
 | `fix/submit-analysis-stuck` | Fixed UI submit deadlock (in-process run launch), checkpointer migration on fresh DBs, Stripe verify fallback | **Merged PR #12** |
 | `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, real `verify_docs` drift check in CI | **Not started** — PR #1 closed/abandoned (predates the provider/sections refactor); `schema.sql` still doesn't exist and the migration-doc test is a no-op |
+| `fix/deploy-dev-permissions` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **PR open — #20** |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + `gh` setup script | Not started |
@@ -526,9 +584,12 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 - Run Alembic migrations on app startup — `migrate` is a separate Docker service
 - Store JWTs anywhere except httpOnly cookies
 - Return `AgentRun.final_output` when `AgentRun.output_locked = True`
-- Add LLM calls to `prepare_inputs` or `format_output` nodes
-- Add a 5th LangGraph node without updating the architecture plan
+- Add LLM calls to `prepare_inputs` or `format_output` nodes — `format_output` re-runs on every section edit; LLM coaching goes in `assess_fit` only
+- Add a new LangGraph node without updating this document's §6 and the architecture plan
+- Add a new `AgentTask` without adding it to **all 5 provider** `_TASK_MODELS` dicts
+- Invent employer names, dates, degrees, certifications, titles, or metrics in rewrite prompts
 - Commit `.env` or any secret file
 - Merge `docs/dev/` into `main`
 - Write a migration without updating `docs/database/tables/{table_name}.md`
 - Use `git push --force` on shared branches
+- Create a dashboard page — the app is single-page only; checkout stays as a popup dialog

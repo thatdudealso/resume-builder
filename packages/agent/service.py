@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from packages.agent.analysts.fit_analyst import assess_fit as _assess_fit
 from packages.agent.analysts.input_analyst import analyze_inputs_combined
 from packages.agent.analysts.jd_analyst import analyze_jd
 from packages.agent.analysts.resume_analyst import analyze_resume
@@ -58,6 +59,15 @@ class AgentService:
             else ResumeAnalysis.model_validate(resume_analysis)
         )
         return compute_match_score(jd, resume, resume_text)
+
+    async def assess_fit(
+        self,
+        jd_analysis: dict[str, object],
+        resume_analysis: dict[str, object],
+        match_score: dict[str, object],
+    ) -> dict[str, object]:
+        result = await _assess_fit(jd_analysis, resume_analysis, match_score, self.provider)
+        return result.model_dump()
 
     def provider_info(self) -> dict[str, str]:
         return {

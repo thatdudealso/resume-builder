@@ -11,6 +11,7 @@ from packages.core.access.service import AccessService
 from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
 from packages.export.pdf_ingest import extract_text_from_upload
+from packages.export.style_extractor import extract_docx_styles
 from packages.integrations.s3_storage import upload_bytes
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -38,12 +39,20 @@ async def upload_resume(
         raise HTTPException(status_code=400, detail="Resume file does not contain readable text.")
     key = f"resumes/{user.id}/{uuid.uuid4()}/{filename}"
     upload_bytes(key, data, file.content_type or "application/octet-stream")
+    style_meta: dict | None = None
+    if filename.lower().endswith(".docx"):
+        try:
+            style_meta = extract_docx_styles(data)
+        except Exception:
+            pass
+
     snap = await access.get_snapshot(user.id)
     resume = MasterResume(
         user_id=user.id,
         filename=filename,
         s3_key=key,
         raw_text=text,
+        style_metadata=style_meta,
         is_free_trial_resume=not snap.free_trial_used,
     )
     session.add(resume)

@@ -90,6 +90,31 @@ async def test_run_stream_progress(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_score_preview_route(client, monkeypatch):
+    await _auth(client, "score@test.com")
+    monkeypatch.setattr(
+        "apps.web.api.v1.resumes.extract_text_from_upload",
+        lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt Python APIs.",
+    )
+    monkeypatch.setattr("apps.web.api.v1.resumes.upload_bytes", lambda k, d, c: k)
+    upload = await client.post(
+        "/api/v1/resumes",
+        files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},
+    )
+    resume_id = upload.json()["resume_id"]
+
+    resp = await client.post(
+        "/api/v1/score/preview",
+        json={"resume_id": resume_id, "jd_text": "Python API developer " * 3},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["overall"] >= 0
+    assert "components" in body["score"]
+
+
+@pytest.mark.asyncio
 async def test_export_download_redirect(client, monkeypatch):
     await _auth(client, "dl@test.com")
     monkeypatch.setattr(

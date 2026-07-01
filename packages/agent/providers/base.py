@@ -13,6 +13,7 @@ class AgentTask(StrEnum):
     RESUME_ANALYSIS = "resume_analysis"
     SECTION_REWRITE = "section_rewrite"
     VALIDATION = "validation"
+    FIT_ASSESSMENT = "fit_assessment"
 
 
 class LLMProvider(ABC):

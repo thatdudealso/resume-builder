@@ -26,7 +26,7 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
-from packages.agent.schemas.variants import DEFAULT_VARIANT, variant_option_labels
+from packages.agent.schemas.variants import DEFAULT_VARIANT
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -35,6 +35,19 @@ STEPS = {
     "rewrite_sections": "Tailoring content",
     "validate_output": "Checking facts",
     "format_output": "Formatting result",
+    "assess_fit": "Assessing fit",
+}
+
+_VERDICT_COLOR = {
+    "Strong fit": "#2f6f5f",
+    "Moderate fit": "#b07d27",
+    "Not a fit": "#a33b30",
+}
+
+_VERDICT_BG = {
+    "Strong fit": "#eef5f1",
+    "Moderate fit": "#fdf7ee",
+    "Not a fit": "#fdf0ef",
 }
 
 
@@ -52,6 +65,12 @@ def _format_detail(response_text: str, fallback: str) -> str:
     except json.JSONDecodeError:
         return fallback
     return str(data.get("detail") or data.get("message") or fallback)
+
+
+def _score_label(score: float | None) -> str:
+    if score is None:
+        return "—"
+    return f"{score:.0f}/100"
 
 
 def _install_page_shell() -> None:
@@ -72,17 +91,9 @@ def _install_page_shell() -> None:
             font-family: Inter, ui-sans-serif, system-ui, -apple-system,
               BlinkMacSystemFont, "Segoe UI", sans-serif;
           }
-          .rb-page {
-            min-height: 100vh;
-            padding: 28px;
-          }
-          .rb-shell {
-            width: min(1180px, 100%);
-            margin: 0 auto;
-          }
-          .rb-header {
-            padding: 10px 0 22px;
-          }
+          .rb-page { min-height: 100vh; padding: 28px; }
+          .rb-shell { width: min(1180px, 100%); margin: 0 auto; }
+          .rb-header { padding: 10px 0 22px; }
           .rb-title {
             font-size: clamp(36px, 6vw, 68px);
             line-height: 0.98;
@@ -90,26 +101,10 @@ def _install_page_shell() -> None:
             letter-spacing: -0.04em;
             max-width: 760px;
           }
-          .rb-section-title {
-            font-size: 20px;
-            line-height: 1.2;
-            font-weight: 650;
-          }
-          .rb-wordmark {
-            font-size: 14px;
-            font-weight: 680;
-          }
-          .rb-subtle {
-            color: var(--rb-muted);
-            font-size: 14px;
-            line-height: 1.5;
-          }
-          .rb-copy {
-            color: var(--rb-muted);
-            font-size: 17px;
-            line-height: 1.55;
-            max-width: 620px;
-          }
+          .rb-section-title { font-size: 20px; line-height: 1.2; font-weight: 650; }
+          .rb-wordmark { font-size: 14px; font-weight: 680; }
+          .rb-subtle { color: var(--rb-muted); font-size: 14px; line-height: 1.5; }
+          .rb-copy { color: var(--rb-muted); font-size: 17px; line-height: 1.55; max-width: 620px; }
           .rb-grid {
             display: grid;
             grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
@@ -129,44 +124,65 @@ def _install_page_shell() -> None:
             padding: 12px 14px;
           }
           .rb-output {
-            min-height: 410px;
-            max-height: 62vh;
+            min-height: 380px;
+            max-height: 56vh;
             overflow: auto;
             white-space: normal;
           }
-          .rb-locked {
-            filter: blur(3px);
-            user-select: none;
-          }
-          .rb-danger {
-            color: #a33b30;
-          }
-          .rb-success {
-            color: #2f6f5f;
-          }
+          .rb-locked { filter: blur(3px); user-select: none; }
+          .rb-danger { color: #a33b30; }
+          .rb-success { color: #2f6f5f; }
           .rb-proof {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 12px;
           }
-          .q-field__control,
-          .q-textarea .q-field__control {
+          .rb-score-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+          }
+          .rb-score-card {
             border-radius: 8px;
+            padding: 12px 16px;
+            border: 1px solid var(--rb-line);
+            background: var(--rb-panel);
           }
-          .q-btn.bg-primary {
-            background: var(--rb-accent) !important;
+          .rb-score-num {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--rb-accent);
           }
-          .text-primary {
-            color: var(--rb-accent) !important;
+          .rb-score-label { font-size: 12px; color: var(--rb-muted); margin-top: 4px; }
+          .rb-fit-panel {
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-top: 12px;
           }
+          .rb-coaching-bullet {
+            font-size: 13px;
+            color: var(--rb-ink);
+            padding: 3px 0;
+            border-left: 3px solid var(--rb-accent);
+            padding-left: 8px;
+            margin: 4px 0;
+          }
+          .rb-gen-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            color: var(--rb-muted);
+            gap: 12px;
+          }
+          .q-field__control, .q-textarea .q-field__control { border-radius: 8px; }
+          .q-btn.bg-primary { background: var(--rb-accent) !important; }
+          .text-primary { color: var(--rb-accent) !important; }
           @media (max-width: 900px) {
-            .rb-page {
-              padding: 18px;
-            }
-            .rb-grid,
-            .rb-proof {
-              grid-template-columns: 1fr;
-            }
+            .rb-page { padding: 18px; }
+            .rb-grid, .rb-proof, .rb-score-row { grid-template-columns: 1fr; }
           }
         </style>
         <script>
@@ -177,11 +193,8 @@ def _install_page_shell() -> None:
                 .find((row) => row.startsWith('rb_device_fingerprint='));
               if (existing) return decodeURIComponent(existing.split('=')[1]);
               const raw = [
-                navigator.userAgent,
-                navigator.language,
-                screen.width,
-                screen.height,
-                screen.colorDepth,
+                navigator.userAgent, navigator.language,
+                screen.width, screen.height, screen.colorDepth,
                 Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'
               ].join('|');
               let hash = 0;
@@ -215,21 +228,22 @@ def index_page() -> None:
         "jd_text": None,
         "payment_id": None,
         "poll_payment": paid_return,
+        "before_score_task": None,
+        "cached_before_jd": None,
+        "cached_before_score": None,
     }
 
     with ui.column().classes("rb-page"):
         with ui.column().classes("rb-shell gap-5"):
             with ui.row().classes("rb-header items-center justify-between w-full"):
-                ui.label("Resume Builder").classes("rb-wordmark")
-                with ui.row().classes("items-center gap-3"):
-                    ui.link("Advanced dashboard", "/app/dashboard").classes("rb-subtle")
-                    ui.label("One private device workspace.").classes("rb-subtle")
+                ui.label("ResumeBild").classes("rb-wordmark")
+                ui.label("One private device workspace.").classes("rb-subtle")
 
             with ui.column().classes("gap-3"):
                 ui.label("Tailor your resume without inventing facts.").classes("rb-title")
                 ui.label(
-                    "Upload a master resume, paste one job description, stream progress, unlock "
-                    "paid output when required, and export from one private workspace."
+                    "Upload a master resume, paste a job description, get three tailored "
+                    "variations with a real job-fit score."
                 ).classes("rb-copy")
 
             with ui.row().classes("rb-proof"):
@@ -238,51 +252,119 @@ def index_page() -> None:
                     ui.label("PDF, DOCX, or TXT master resume.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("2. Tailor").classes("font-medium")
+                    ui.label("Three variations tailored to the JD language.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("3. Unlock").classes("font-medium")
+                    ui.label("Export DOCX/PDF with your original formatting.").classes("rb-subtle")
 
             with ui.element("section").classes("rb-grid w-full"):
+                # ── Left: Inputs ──────────────────────────────────────────
                 with ui.column().classes("rb-panel gap-4"):
                     ui.label("Inputs").classes("rb-section-title")
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
                     provider_select = ui.select(
-                        label="AI model",
-                        options={},
-                        value=None,
-                    ).classes("w-full")
-                    variant_select = ui.select(
-                        label="Tailoring style",
-                        options=variant_option_labels(),
-                        value=DEFAULT_VARIANT.value,
+                        label="AI model", options={}, value=None
                     ).classes("w-full")
                     resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
                     upload_status = ui.label("").classes("text-sm")
                     upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
                         "w-full"
                     )
-                    jd_input = ui.textarea("Job description").props("outlined").classes("w-full")
-                    jd_input.props("autogrow")
-                    run_button = ui.button("Tailor resume", icon="auto_awesome").props(
-                        "unelevated"
+                    jd_input = ui.textarea("Job description").props("outlined autogrow").classes(
+                        "w-full"
                     )
+
+                    # Before-score card (hidden until data available)
+                    with ui.element("div").classes("rb-score-card hidden") as before_card:
+                        ui.label("Pre-run fit estimate").classes("rb-score-label")
+                        before_score_num = ui.label("—").classes("rb-score-num")
+                        before_score_sub = ui.label("").classes("rb-subtle text-xs")
+
+                    run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
                     progress_label = ui.label("Ready").classes("rb-subtle")
                     progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
 
-                with ui.column().classes("gap-4").style("min-width: 0;"):
-                    with ui.row().classes("items-center justify-between w-full"):
-                        ui.label("Output").classes("rb-section-title")
-                        export_row = ui.row().classes("gap-2 hidden")
-                    output = ui.markdown(
-                        "Upload a resume, paste a job description, then start a tailored run."
-                    ).classes("rb-panel rb-output w-full")
+                # ── Right: Output ─────────────────────────────────────────
+                with ui.column().classes("gap-3").style("min-width: 0;"):
+
+                    # Score comparison row (hidden until run complete)
+                    with ui.element("div").classes("rb-score-row hidden") as score_row:
+                        with ui.element("div").classes("rb-score-card"):
+                            ui.label("Before tailoring").classes("rb-score-label")
+                            score_before_num = ui.label("—").classes("rb-score-num")
+                        with ui.element("div").classes("rb-score-card"):
+                            ui.label("After tailoring").classes("rb-score-label")
+                            score_after_num = ui.label("—").classes("rb-score-num")
+
+                    # Variant tabs
+                    with ui.card().classes("w-full p-0").style(
+                        "border:1px solid var(--rb-line);"
+                        "border-radius:10px;"
+                        "overflow:hidden;"
+                    ):
+                        with ui.tabs().classes("w-full") as variant_tabs:
+                            ui.tab("conservative", label="Light touch", icon="tune")
+                            ui.tab("balanced", label="Standard fit", icon="balance")
+                            ui.tab("bold", label="Bold match", icon="bolt")
+
+                        with ui.tab_panels(variant_tabs, value=DEFAULT_VARIANT.value).classes(
+                            "w-full p-0"
+                        ):
+                            # Conservative tab
+                            with ui.tab_panel("conservative").classes("p-4"):
+                                conservative_output = ui.markdown(
+                                    "_Generate the Light Touch variant after the main "
+                                    "run completes._"
+                                ).classes("rb-output w-full")
+                                conservative_gen_row = ui.row().classes("gap-2 items-center hidden")
+                                with conservative_gen_row:
+                                    conservative_gen_btn = ui.button(
+                                        "Generate Light Touch", icon="tune"
+                                    ).props("unelevated")
+                                    conservative_gen_status = ui.label("").classes("rb-subtle")
+
+                            # Balanced tab (default)
+                            with ui.tab_panel("balanced").classes("p-4"):
+                                balanced_output = ui.markdown(
+                                    "Upload a resume, paste a job description, then "
+                                    "start a tailored run."
+                                ).classes("rb-output w-full")
+                                balanced_gen_row = ui.row().classes("gap-2 items-center hidden")
+                                with balanced_gen_row:
+                                    balanced_gen_btn = ui.button(
+                                        "Generate Standard Fit", icon="balance"
+                                    ).props("unelevated")
+                                    balanced_gen_status = ui.label("").classes("rb-subtle")
+
+                            # Bold tab
+                            with ui.tab_panel("bold").classes("p-4"):
+                                bold_output = ui.markdown(
+                                    "_Generate the Bold Match variant after the main "
+                                    "run completes._"
+                                ).classes("rb-output w-full")
+                                bold_gen_row = ui.row().classes("gap-2 items-center hidden")
+                                with bold_gen_row:
+                                    bold_gen_btn = ui.button(
+                                        "Generate Bold Match", icon="bolt"
+                                    ).props("unelevated")
+                                    bold_gen_status = ui.label("").classes("rb-subtle")
+
+                    # Export buttons row
+                    export_row = ui.row().classes("gap-2 hidden")
+
+                    # Fit assessment panel (hidden until run complete)
+                    fit_panel = ui.element("div").classes("rb-fit-panel hidden")
+                    with fit_panel:
+                        fit_verdict_label = ui.label("").classes("font-medium text-base")
+                        fit_bullets_col = ui.column().classes("gap-1 mt-2")
+
                     payment_status = ui.label("").classes("rb-subtle")
 
+    # ── Paywall dialog ─────────────────────────────────────────────────────
     paywall_dialog = ui.dialog()
     with paywall_dialog, ui.card().classes("gap-3").style("width: min(420px, 92vw);"):
         ui.label("Unlock full output").classes("text-lg font-medium")
-        paywall_price = ui.label(f"Unlock for {_format_price(3.99)}").classes(
-            "text-base font-medium"
-        )
+        paywall_price = ui.label("Unlock for $3.99").classes("text-base font-medium")
         ui.label(
             "The run is complete, but the tailored resume stays hidden until payment confirms."
         ).classes("rb-subtle")
@@ -290,6 +372,18 @@ def index_page() -> None:
             stripe_button = ui.button("Stripe", icon="credit_card").props("unelevated")
             crypto_button = ui.button("Crypto", icon="currency_bitcoin").props("outline")
         crypto_status = ui.label("").classes("rb-subtle")
+
+    # ── Helpers ────────────────────────────────────────────────────────────
+    _variant_outputs = {
+        "conservative": conservative_output,
+        "balanced": balanced_output,
+        "bold": bold_output,
+    }
+    _variant_gen_rows = {
+        "conservative": (conservative_gen_row, conservative_gen_btn, conservative_gen_status),
+        "balanced": (balanced_gen_row, balanced_gen_btn, balanced_gen_status),
+        "bold": (bold_gen_row, bold_gen_btn, bold_gen_status),
+    }
 
     async def load_providers() -> None:
         async with api_client() as client:
@@ -314,7 +408,6 @@ def index_page() -> None:
 
         if user_resp.status_code != 200:
             status_label.set_text("Device workspace unavailable. Refresh this page.")
-            output.set_content("Could not prepare the local device workspace.")
             return
 
         user = user_resp.json()
@@ -364,6 +457,40 @@ def index_page() -> None:
         if jd_text and not (jd_input.value or "").strip():
             jd_input.value = jd_text
 
+    async def _compute_before_score() -> None:
+        resume_id = state.get("resume_id")
+        jd_text = (jd_input.value or "").strip()
+        if not resume_id or len(jd_text) < 20:
+            return
+        if state.get("cached_before_jd") == jd_text:
+            return
+        provider = provider_select.value or "huggingface"
+        async with api_client() as client:
+            resp = await client.post(
+                "/api/v1/score/preview",
+                json={"resume_id": str(resume_id), "jd_text": jd_text, "provider": provider},
+            )
+        if resp.status_code == 200:
+            data = resp.json()
+            overall = data.get("overall")
+            if overall is not None:
+                before_score_num.set_text(f"{overall:.0f}")
+                before_score_sub.set_text("out of 100 — before tailoring")
+                before_card.classes(remove="hidden")
+                state["cached_before_score"] = overall
+                state["cached_before_jd"] = jd_text
+
+    async def schedule_before_score() -> None:
+        task = state.get("before_score_task")
+        if task and not task.done():
+            task.cancel()
+        async def _delayed():
+            await asyncio.sleep(1.5)
+            await _compute_before_score()
+        state["before_score_task"] = asyncio.create_task(_delayed())
+
+    jd_input.on("update:model-value", lambda _: asyncio.create_task(schedule_before_score()))
+
     async def handle_upload(event: Any) -> None:
         upload_file = event.file
         upload_status.set_text("Uploading resume...")
@@ -390,17 +517,50 @@ def index_page() -> None:
         if response.status_code == 200:
             data = response.json()
             state["resume_id"] = data["resume_id"]
+            state["cached_before_jd"] = None
+            state["cached_before_score"] = None
             resume_label.set_text(f"Resume: {data['filename']}")
             upload_status.set_text("Resume uploaded.")
             upload_status.classes(remove="rb-danger")
             upload_status.classes(add="rb-success")
             await load_account()
+            await schedule_before_score()
             return
         upload_status.set_text(_format_detail(response.text, "Upload failed"))
         upload_status.classes(remove="rb-subtle")
         upload_status.classes(add="rb-danger")
 
     upload.on_upload(handle_upload)
+
+    def _display_variants(final_output: dict) -> None:
+        variants = final_output.get("variants") or {}
+        for vname, output_md in _variant_outputs.items():
+            gen_row, _gen_btn, _gen_status = _variant_gen_rows[vname]
+            if vname in variants:
+                plain = variants[vname].get("plain_text") or ""
+                output_md.set_content(plain)
+                gen_row.classes(add="hidden")
+            else:
+                output_md.set_content("")
+                gen_row.classes(remove="hidden")
+
+    def _display_fit_assessment(final_output: dict) -> None:
+        fit = final_output.get("fit_assessment")
+        if not fit:
+            fit_panel.classes(add="hidden")
+            return
+        verdict = fit.get("verdict", "Moderate fit")
+        bullets = fit.get("coaching_bullets") or []
+        color = _VERDICT_COLOR.get(verdict, "#66736d")
+        bg = _VERDICT_BG.get(verdict, "#f7f8f6")
+        fit_panel.style(f"background:{bg};border:1px solid {color}33;")
+        fit_verdict_label.set_text(f"Fit verdict: {verdict}")
+        fit_verdict_label.style(f"color:{color};")
+        fit_bullets_col.clear()
+        with fit_bullets_col:
+            for bullet in bullets:
+                ui.label(bullet).classes("rb-coaching-bullet")
+        fit_panel.classes(remove="hidden")
 
     async def refresh_run(show_paywall: bool = False) -> dict[str, Any] | None:
         run_id = state.get("run_id")
@@ -415,34 +575,97 @@ def index_page() -> None:
         body = response.json()
         state["current_run"] = body
         apply_form_from_state(body)
+
         is_locked = bool(body.get("output_locked")) and not body.get("final_output")
         if is_locked:
             export_row.classes(add="hidden")
-            output.classes(add="rb-locked")
-            output.set_content(f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}")
+            score_row.classes(add="hidden")
+            fit_panel.classes(add="hidden")
+            balanced_output.classes(add="rb-locked")
+            balanced_output.set_content(
+                f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}"
+            )
             payment_status.set_text("Payment required to reveal the full tailored resume.")
             if show_paywall or body.get("status") == "completed":
                 paywall_dialog.open()
             return body
 
         final_output = body.get("final_output") or {}
-        output.classes(remove="rb-locked")
-        output.set_content(final_output.get("plain_text") or body.get("preview_text") or "")
-        payment_status.set_text("Output is available.")
+        balanced_output.classes(remove="rb-locked")
+
+        # Scores
+        match_score = final_output.get("match_score") or {}
+        score_before_val = match_score.get("previous_overall")
+        score_after_val = match_score.get("current_overall")
+        if score_before_val is not None or score_after_val is not None:
+            score_before_num.set_text(_score_label(score_before_val))
+            score_after_num.set_text(_score_label(score_after_val))
+            score_row.classes(remove="hidden")
+            # update before card in inputs panel too
+            if score_before_val is not None:
+                before_score_num.set_text(f"{score_before_val:.0f}")
+                before_score_sub.set_text("out of 100 — before tailoring")
+                before_card.classes(remove="hidden")
+
+        # Variant outputs
+        _display_variants(final_output)
+        _display_fit_assessment(final_output)
+
+        payment_status.set_text("")
         export_row.classes(remove="hidden")
         export_row.clear()
         with export_row:
             ui.button("TXT", icon="description", on_click=lambda: do_export("txt")).props("flat")
-            docx = ui.button("DOCX", icon="article", on_click=lambda: do_export("docx")).props(
+            docx_btn = ui.button("DOCX", icon="article", on_click=lambda: do_export("docx")).props(
                 "flat"
             )
-            pdf = ui.button("PDF", icon="picture_as_pdf", on_click=lambda: do_export("pdf")).props(
-                "flat"
+            pdf_btn = ui.button(
+                "PDF",
+                icon="picture_as_pdf",
+                on_click=lambda: do_export("pdf"),
+            ).props(
+                "flat",
             )
             if body.get("is_free_trial_run"):
-                docx.props("disable")
-                pdf.props("disable")
+                docx_btn.props("disable")
+                pdf_btn.props("disable")
         return body
+
+    def _wire_variant_gen_button(variant_name: str) -> None:
+        gen_row, gen_btn, gen_status = _variant_gen_rows[variant_name]
+        output_md = _variant_outputs[variant_name]
+
+        async def _generate() -> None:
+            run_id = state.get("run_id")
+            if not run_id:
+                return
+            gen_btn.props("loading")
+            gen_status.set_text("Generating variant...")
+            async with api_client() as client:
+                resp = await client.post(
+                    f"/api/v1/runs/{run_id}/variants/{variant_name}/generate"
+                )
+            gen_btn.props(remove="loading")
+            if resp.status_code == 200:
+                data = resp.json()
+                variants = (data.get("final_output") or {}).get("variants") or {}
+                if variant_name in variants:
+                    plain = variants[variant_name].get("plain_text") or ""
+                    output_md.set_content(plain)
+                    gen_row.classes(add="hidden")
+                    gen_status.set_text("")
+                    # refresh scores too
+                    await refresh_run()
+                else:
+                    gen_status.set_text("Variant generated — reload to view.")
+            else:
+                gen_status.set_text(_format_detail(resp.text, "Generation failed"))
+
+        gen_btn.on_click(_generate)
+
+    _wire_variant_gen_button("conservative")
+    _wire_variant_gen_button("balanced")
+    _wire_variant_gen_button("bold")
 
     async def do_export(fmt: str) -> None:
         run_id = state.get("run_id")
@@ -513,13 +736,13 @@ def index_page() -> None:
     async def tailor() -> None:
         jd_text = (jd_input.value or "").strip()
         if len(jd_text) < 20:
-            output.set_content("Job description must be at least 20 characters.")
+            balanced_output.set_content("Job description must be at least 20 characters.")
             return
         if not state.get("resume_id"):
             await load_account()
         resume_id = state.get("resume_id")
         if not resume_id:
-            output.set_content("Upload a resume before tailoring.")
+            balanced_output.set_content("Upload a resume before tailoring.")
             return
 
         log_console(
@@ -527,37 +750,41 @@ def index_page() -> None:
             resume_id=resume_id,
             jd_chars=len(jd_text),
             provider=provider_select.value or "huggingface",
-            variant=variant_select.value or DEFAULT_VARIANT.value,
         )
         run_button.props("loading")
         progress.value = 0.05
         progress_label.set_text("Creating run")
         payment_status.set_text("")
-        output.classes(remove="rb-locked")
-        output.set_content("Starting the tailoring workflow...")
+        balanced_output.classes(remove="rb-locked")
+        balanced_output.set_content("Starting the tailoring workflow...")
+        conservative_output.set_content("_Will generate after main run…_")
+        bold_output.set_content("_Will generate after main run…_")
+        conservative_gen_row.classes(add="hidden")
+        bold_gen_row.classes(add="hidden")
+        score_row.classes(add="hidden")
+        fit_panel.classes(add="hidden")
         paywall_dialog.close()
         export_row.classes(add="hidden")
 
         try:
             async with request_user_session() as (session, user):
-                log_console("tailor: creating run in-process (avoiding HTTP self-call)")
                 data = await create_run_record(
                     session,
                     user,
                     resume_id=UUID(str(resume_id)),
                     jd_text=jd_text,
                     llm_provider=provider_select.value or "huggingface",
-                    variant=variant_select.value or DEFAULT_VARIANT.value,
+                    variant=DEFAULT_VARIANT.value,
                 )
         except RunLaunchError as exc:
             log_console("tailor: run creation failed", level="error", detail=exc.detail)
             run_button.props(remove="loading")
-            output.set_content(exc.detail)
+            balanced_output.set_content(exc.detail)
             return
         except Exception as exc:
             log_console("tailor: unexpected error", level="error", detail=str(exc))
             run_button.props(remove="loading")
-            output.set_content(f"Could not start run: {exc}")
+            balanced_output.set_content(f"Could not start run: {exc}")
             return
 
         log_console("tailor: run created", run_id=data["run_id"], status=data.get("status"))
@@ -569,7 +796,6 @@ def index_page() -> None:
             jd_text=jd_text,
         )
         try:
-            log_console("tailor: starting execution and progress watch")
             result, _ = await asyncio.gather(
                 stream_progress(data["run_id"]),
                 execute_run_background(UUID(data["run_id"]), data["variant"]),
@@ -580,8 +806,17 @@ def index_page() -> None:
                 return
         finally:
             run_button.props(remove="loading")
-        await refresh_run(show_paywall=True)
+
+        body = await refresh_run(show_paywall=True)
         await load_account()
+
+        # Show generate buttons for the other two variants
+        if body and body.get("final_output"):
+            variants_built = set((body["final_output"].get("variants") or {}).keys())
+            for vname in ["conservative", "balanced", "bold"]:
+                if vname not in variants_built:
+                    gen_row, _, _ = _variant_gen_rows[vname]
+                    gen_row.classes(remove="hidden")
 
     run_button.on_click(tailor)
 
@@ -601,13 +836,7 @@ def index_page() -> None:
             return
         await sync_payment_status()
         body = await refresh_run(show_paywall=False)
-        if body and body.get("final_output"):
-            state["poll_payment"] = False
-            paywall_dialog.close()
-            payment_status.set_text("Payment confirmed. Output unlocked.")
-            await load_account()
-            await clear_browser_workflow()
-        elif body and not body.get("output_locked"):
+        if body and (body.get("final_output") or not body.get("output_locked")):
             state["poll_payment"] = False
             paywall_dialog.close()
             payment_status.set_text("Payment confirmed. Output unlocked.")
@@ -639,4 +868,4 @@ def index_page() -> None:
 
 
 def mount_ui() -> None:
-    from apps.web.ui import dashboard  # noqa: F401
+    pass

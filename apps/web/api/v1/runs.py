@@ -14,6 +14,7 @@ from apps.web.config import settings
 from apps.web.dependencies import get_current_user, get_db
 from apps.web.services.run_editor import (
     add_section_and_retailor,
+    generate_variant,
     select_variant,
     update_section_override,
 )
@@ -261,3 +262,31 @@ async def add_run_section(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"run_id": str(run_id), "section": section_name, "final_output": final}
+
+
+@router.post("/{run_id}/variants/{variant_name}/generate")
+async def generate_run_variant(
+    run_id: UUID,
+    variant_name: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    run = await session.get(AgentRun, run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if run.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Run must be completed before generating variants",
+        )
+    resume = await session.get(MasterResume, run.master_resume_id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    access = AccessService(session)
+    if not await access.can_view_output(user.id, run):
+        raise HTTPException(status_code=402, detail="Unlock output before generating variants")
+    try:
+        result = await generate_variant(session, run, resume, variant_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"run_id": str(run_id), "variant": variant_name, **result}

@@ -15,6 +15,7 @@ _TASK_MODELS: dict[AgentTask, str] = {
     AgentTask.RESUME_ANALYSIS: GROK_MODEL,
     AgentTask.SECTION_REWRITE: GROK_MODEL,
     AgentTask.VALIDATION: GROK_MODEL,
+    AgentTask.FIT_ASSESSMENT: GROK_MODEL,
 }
 
 
