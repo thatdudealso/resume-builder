@@ -151,11 +151,13 @@ async def test_export_download_redirect(client, monkeypatch):
 
     await asyncio.sleep(0.05)
     monkeypatch.setattr("apps.web.api.v1.exports.upload_bytes", lambda k, d, c: k)
-    monkeypatch.setattr("apps.web.api.v1.exports.presigned_url", lambda key: "https://signed.example/x")
+    monkeypatch.setattr("apps.web.api.v1.exports.download_bytes", lambda k: b"resume content")
     export = await client.post("/api/v1/exports", json={"run_id": run_id, "format": "txt"})
     export_id = export.json()["export_id"]
-    resp = await client.get(f"/api/v1/exports/{export_id}/download", follow_redirects=False)
-    assert resp.status_code in (307, 302, 303)
+    resp = await client.get(f"/api/v1/exports/{export_id}/download")
+    assert resp.status_code == 200
+    assert resp.headers["content-disposition"].startswith("attachment")
+    assert b"resume content" in resp.content
 
 
 @pytest.mark.asyncio

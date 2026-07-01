@@ -15,9 +15,15 @@ from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
 from packages.export.docx_export import export_docx, export_txt
 from packages.export.pdf_export import export_pdf
-from packages.integrations.s3_storage import presigned_url, upload_bytes
+from packages.integrations.s3_storage import download_bytes, upload_bytes
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+
+_CONTENT_TYPES: dict[str, str] = {
+    "txt": "text/plain; charset=utf-8",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+}
 
 
 class ExportRequest(BaseModel):
@@ -73,7 +79,13 @@ async def download_export(
     export = await session.get(Export, export_id)
     if export is None or export.user_id != user.id:
         raise HTTPException(status_code=404, detail="Export not found")
-    url = presigned_url(export.s3_key)
-    from starlette.responses import RedirectResponse
+    from starlette.responses import Response
 
-    return RedirectResponse(url)
+    data = download_bytes(export.s3_key)
+    content_type = _CONTENT_TYPES.get(export.format, "application/octet-stream")
+    filename = f"resume.{export.format}"
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -55,7 +55,7 @@ async def test_auth_refresh_errors(client):
 @pytest.mark.asyncio
 async def test_export_locked_and_download(client, monkeypatch):
     monkeypatch.setattr("apps.web.api.v1.exports.upload_bytes", lambda k, d, c: k)
-    monkeypatch.setattr("apps.web.api.v1.exports.presigned_url", lambda k: "https://s3.test/file")
+    monkeypatch.setattr("apps.web.api.v1.exports.download_bytes", lambda k: b"file-bytes")
     async def noop_background(run_id, variant=None):
         return None
 
@@ -104,15 +104,14 @@ async def test_export_locked_and_download(client, monkeypatch):
         await s.commit()
 
     monkeypatch.setattr("apps.web.api.v1.exports.upload_bytes", lambda k, d, c: k)
-    monkeypatch.setattr("packages.integrations.s3_storage.upload_bytes", lambda k, d, c: k)
-    monkeypatch.setattr("packages.integrations.s3_storage.presigned_url", lambda k: "https://s3.test/file")
     monkeypatch.setattr("apps.web.api.v1.exports.export_pdf", lambda t: b"%PDF-1.4")
-    monkeypatch.setattr("apps.web.api.v1.exports.presigned_url", lambda k: "https://s3.test/file")
+    monkeypatch.setattr("apps.web.api.v1.exports.download_bytes", lambda k: b"docx-bytes")
     created = await client.post("/api/v1/exports", json={"run_id": run_id, "format": "docx"})
     assert created.status_code == 200
     export_id = created.json()["export_id"]
-    dl = await client.get(f"/api/v1/exports/{export_id}/download", follow_redirects=False)
-    assert dl.status_code in (302, 307)
+    dl = await client.get(f"/api/v1/exports/{export_id}/download")
+    assert dl.status_code == 200
+    assert dl.headers["content-disposition"].startswith("attachment")
 
 
 @pytest.mark.asyncio
