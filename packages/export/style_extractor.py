@@ -5,6 +5,10 @@ import io
 from docx import Document
 
 
+def _read_size_pt(run) -> float:
+    return run.font.size.pt
+
+
 def extract_docx_styles(data: bytes) -> dict[str, object]:
     """Return a best-effort style summary from a DOCX: fonts, sizes, spacing."""
     doc = Document(io.BytesIO(data))
@@ -32,7 +36,7 @@ def extract_docx_styles(data: bytes) -> dict[str, object]:
                 fonts[run.font.name] = fonts.get(run.font.name, 0) + 1
             if run.font.size:
                 try:
-                    size_pt = run.font.size.pt
+                    size_pt = _read_size_pt(run)
                 except Exception:
                     continue
                 sizes.append(size_pt)
@@ -44,7 +48,7 @@ def extract_docx_styles(data: bytes) -> dict[str, object]:
     # Heading size: smallest bold/heading-styled size that's larger than body text,
     # capped at body+6pt to exclude title/name lines (typically 14pt+ above body).
     heading_candidates = [s for s in heading_sizes if body_size < s <= body_size + 6]
-    heading_size = round(min(heading_candidates)) if heading_candidates else body_size + 2
+    heading_size = round(min(heading_candidates)) if heading_candidates else body_size
     avg_space_before = round(sum(space_before) / len(space_before)) if space_before else 6
     avg_space_after = round(sum(space_after) / len(space_after)) if space_after else 6
 

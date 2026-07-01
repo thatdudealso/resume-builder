@@ -71,7 +71,7 @@ def test_extract_docx_styles_reads_font_spacing_and_bullets():
 
     assert styles["font"] == "Arial"
     assert styles["body_size_pt"] == 11
-    assert styles["heading_size_pt"] == 11
+    assert styles["heading_size_pt"] == 11  # no bold/heading runs → fallback equals body_size
     assert styles["space_before_pt"] == 4
     assert styles["space_after_pt"] == 8
     assert styles["has_bullets"] is True
@@ -84,14 +84,14 @@ def test_extract_docx_styles_ignores_unreadable_run_sizes(monkeypatch):
     buffer = io.BytesIO()
     source.save(buffer)
 
-    def broken_pt(value):
+    def broken_read(run):
         raise ValueError("bad size")
 
-    monkeypatch.setattr("packages.export.style_extractor.Pt", broken_pt)
+    monkeypatch.setattr("packages.export.style_extractor._read_size_pt", broken_read)
 
     styles = extract_docx_styles(buffer.getvalue())
 
-    assert styles["body_size_pt"] == 11
+    assert styles["body_size_pt"] == 11  # default when all sizes fail to parse
 
 
 def test_extract_txt():

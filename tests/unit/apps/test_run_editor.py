@@ -210,7 +210,7 @@ async def test_generate_variant_adds_requested_variant(session, monkeypatch):
     variants = result["final_output"]["variants"]
     assert variants["bold"]["plain_text"].startswith("Jane Doe")
     assert variants["bold"]["match_score"]["overall"] >= 0
-    assert run.ats_score_after is not None
+    assert run.ats_score_after is None  # bold is not canonical (balanced is); score unchanged
 
 
 @pytest.mark.asyncio
