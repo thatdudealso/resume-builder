@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import random
 from typing import Any
 from uuid import UUID
 
@@ -26,7 +27,7 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
-from packages.agent.schemas.variants import DEFAULT_VARIANT
+from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS
 
 STEPS = {
     "prepare_inputs": "Reading resume",
@@ -37,6 +38,26 @@ STEPS = {
     "format_output": "Formatting result",
     "assess_fit": "Assessing fit",
 }
+
+_SECTION_LABELS: dict[str, str] = {
+    "summary": "Summary",
+    "experience": "Experience",
+    "skills": "Skills",
+    "education": "Education",
+}
+
+_PLACEHOLDER_GENERATE = "_Generate this variant after the main run completes._"
+_PLACEHOLDER_LOADING = "Starting the tailoring workflow..."
+
+_RESUME_QUOTES = [
+    "_Your future boss is already impressed — they just haven't read this yet._ 🌟",
+    "_Plot twist: you were qualified the whole time._ 🎭",
+    "_Somewhere, a hiring manager is about to have a really good day._ ☀️",
+    "_Turning your career into a highlight reel, one bullet at a time._ 🎬",
+    "_Even SpongeBob had a resume. Yours is going to be so much better._ 🧽",
+    "_Good things take time. Great tailored resumes take slightly less time._ ⏳",
+    "_Your experience section is about to get a glow-up._ ✨",
+]
 
 _VERDICT_COLOR = {
     "Strong fit": "#2f6f5f",
@@ -123,13 +144,20 @@ def _install_page_shell() -> None:
             border-radius: 10px;
             padding: 12px 14px;
           }
-          .rb-output {
-            min-height: 380px;
-            max-height: 56vh;
-            overflow: auto;
-            white-space: normal;
+          .rb-section-box {
+            border: 1px solid var(--rb-line);
+            border-radius: 8px;
+            padding: 14px 16px;
+            background: var(--rb-panel);
           }
-          .rb-locked { filter: blur(3px); user-select: none; }
+          .rb-section-box-header {
+            font-size: 12px;
+            font-weight: 650;
+            color: var(--rb-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+          }
+          .rb-locked { filter: blur(3px); user-select: none; pointer-events: none; }
           .rb-danger { color: #a33b30; }
           .rb-success { color: #2f6f5f; }
           .rb-proof {
@@ -307,47 +335,68 @@ def index_page() -> None:
                             ui.tab("balanced", label="Standard fit", icon="balance")
                             ui.tab("bold", label="Bold match", icon="bolt")
 
+                        # section refs: {vname: {section_key: ui.markdown}}
+                        _variant_sections: dict[str, dict[str, Any]] = {}
+                        # wrapper refs for paywall blur: {vname: ui.column}
+                        _variant_wrappers: dict[str, Any] = {}
+                        # copy button refs: {vname: {section_key: ui.button}}
+                        _variant_copy_btns: dict[str, dict[str, Any]] = {}
+
                         with ui.tab_panels(variant_tabs, value=DEFAULT_VARIANT.value).classes(
                             "w-full p-0"
                         ):
-                            # Conservative tab
-                            with ui.tab_panel("conservative").classes("p-4"):
-                                conservative_output = ui.markdown(
-                                    "_Generate the Light Touch variant after the main "
-                                    "run completes._"
-                                ).classes("rb-output w-full")
-                                conservative_gen_row = ui.row().classes("gap-2 items-center hidden")
-                                with conservative_gen_row:
-                                    conservative_gen_btn = ui.button(
-                                        "Generate Light Touch", icon="tune"
-                                    ).props("unelevated")
-                                    conservative_gen_status = ui.label("").classes("rb-subtle")
+                            _tab_cfg = [
+                                ("conservative", "Generate Light Touch", "tune",
+                                 _PLACEHOLDER_GENERATE),
+                                ("balanced", "Generate Standard Fit", "balance",
+                                 "Upload a resume, paste a job description, then start a tailored run."),
+                                ("bold", "Generate Bold Match", "bolt",
+                                 _PLACEHOLDER_GENERATE),
+                            ]
+                            _gen_rows: dict[str, Any] = {}
+                            _gen_btns: dict[str, Any] = {}
+                            _gen_statuses: dict[str, Any] = {}
 
-                            # Balanced tab (default)
-                            with ui.tab_panel("balanced").classes("p-4"):
-                                balanced_output = ui.markdown(
-                                    "Upload a resume, paste a job description, then "
-                                    "start a tailored run."
-                                ).classes("rb-output w-full")
-                                balanced_gen_row = ui.row().classes("gap-2 items-center hidden")
-                                with balanced_gen_row:
-                                    balanced_gen_btn = ui.button(
-                                        "Generate Standard Fit", icon="balance"
-                                    ).props("unelevated")
-                                    balanced_gen_status = ui.label("").classes("rb-subtle")
+                            for _vname, _gen_label, _gen_icon, _placeholder in _tab_cfg:
+                                with ui.tab_panel(_vname).classes("p-4"):
+                                    with ui.column().classes("gap-3 w-full") as _wrapper:
+                                        _variant_wrappers[_vname] = _wrapper
+                                        _variant_sections[_vname] = {}
+                                        _variant_copy_btns[_vname] = {}
+                                        for _sk in SECTION_KEYS:
+                                            with ui.element("div").classes("rb-section-box w-full"):
+                                                with ui.row().classes(
+                                                    "items-center justify-between w-full"
+                                                ):
+                                                    ui.label(
+                                                        _SECTION_LABELS[_sk]
+                                                    ).classes("rb-section-box-header")
+                                                    _copy_btn = ui.button(
+                                                        icon="content_copy"
+                                                    ).props("flat dense round")
+                                                    _variant_copy_btns[_vname][_sk] = _copy_btn
+                                                _variant_sections[_vname][_sk] = ui.markdown(
+                                                    _placeholder if _sk == "summary" else ""
+                                                ).classes("w-full")
+                                    _gen_row = ui.row().classes("gap-2 items-center hidden")
+                                    with _gen_row:
+                                        _gen_btn = ui.button(
+                                            _gen_label, icon=_gen_icon
+                                        ).props("unelevated")
+                                        _gen_status = ui.label("").classes("rb-subtle")
+                                    _gen_rows[_vname] = _gen_row
+                                    _gen_btns[_vname] = _gen_btn
+                                    _gen_statuses[_vname] = _gen_status
 
-                            # Bold tab
-                            with ui.tab_panel("bold").classes("p-4"):
-                                bold_output = ui.markdown(
-                                    "_Generate the Bold Match variant after the main "
-                                    "run completes._"
-                                ).classes("rb-output w-full")
-                                bold_gen_row = ui.row().classes("gap-2 items-center hidden")
-                                with bold_gen_row:
-                                    bold_gen_btn = ui.button(
-                                        "Generate Bold Match", icon="bolt"
-                                    ).props("unelevated")
-                                    bold_gen_status = ui.label("").classes("rb-subtle")
+                        conservative_gen_row = _gen_rows["conservative"]
+                        conservative_gen_btn = _gen_btns["conservative"]
+                        conservative_gen_status = _gen_statuses["conservative"]
+                        balanced_gen_row = _gen_rows["balanced"]
+                        balanced_gen_btn = _gen_btns["balanced"]
+                        balanced_gen_status = _gen_statuses["balanced"]
+                        bold_gen_row = _gen_rows["bold"]
+                        bold_gen_btn = _gen_btns["bold"]
+                        bold_gen_status = _gen_statuses["bold"]
 
                     # Export buttons row
                     export_row = ui.row().classes("gap-2 hidden")
@@ -374,16 +423,32 @@ def index_page() -> None:
         crypto_status = ui.label("").classes("rb-subtle")
 
     # ── Helpers ────────────────────────────────────────────────────────────
-    _variant_outputs = {
-        "conservative": conservative_output,
-        "balanced": balanced_output,
-        "bold": bold_output,
-    }
+    state["section_texts"] = {}
+
     _variant_gen_rows = {
         "conservative": (conservative_gen_row, conservative_gen_btn, conservative_gen_status),
         "balanced": (balanced_gen_row, balanced_gen_btn, balanced_gen_status),
         "bold": (bold_gen_row, bold_gen_btn, bold_gen_status),
     }
+
+    def _make_copy_handler(vname: str, sk: str, btn: Any) -> Any:
+        async def _copy() -> None:
+            text = (state["section_texts"].get(vname) or {}).get(sk) or ""
+            try:
+                await ui.run_javascript(
+                    f"navigator.clipboard.writeText({json.dumps(text)})"
+                )
+                btn.props("icon=check")
+                await asyncio.sleep(1.5)
+            except Exception:
+                pass
+            finally:
+                btn.props("icon=content_copy")
+        return _copy
+
+    for _v, _sks in _variant_copy_btns.items():
+        for _s, _btn in _sks.items():
+            _btn.on_click(_make_copy_handler(_v, _s, _btn))
 
     async def load_providers() -> None:
         async with api_client() as client:
@@ -534,14 +599,20 @@ def index_page() -> None:
 
     def _display_variants(final_output: dict) -> None:
         variants = final_output.get("variants") or {}
-        for vname, output_md in _variant_outputs.items():
+        state["section_texts"] = {}
+        for vname, section_mds in _variant_sections.items():
             gen_row, _gen_btn, _gen_status = _variant_gen_rows[vname]
             if vname in variants:
-                plain = variants[vname].get("plain_text") or ""
-                output_md.set_content(plain)
+                sections = variants[vname].get("sections") or {}
+                state["section_texts"][vname] = {}
+                for sk, md in section_mds.items():
+                    text = sections.get(sk) or ""
+                    md.set_content(text)
+                    state["section_texts"][vname][sk] = text
                 gen_row.classes(add="hidden")
             else:
-                output_md.set_content("")
+                for md in section_mds.values():
+                    md.set_content(random.choice(_RESUME_QUOTES))
                 gen_row.classes(remove="hidden")
 
     def _display_fit_assessment(final_output: dict) -> None:
@@ -581,17 +652,20 @@ def index_page() -> None:
             export_row.classes(add="hidden")
             score_row.classes(add="hidden")
             fit_panel.classes(add="hidden")
-            balanced_output.classes(add="rb-locked")
-            balanced_output.set_content(
-                f"**Preview**\n\n{body.get('preview_text') or 'Payment required.'}"
-            )
+            for _vn in _variant_wrappers:
+                _variant_wrappers[_vn].classes(add="rb-locked")
+            preview = body.get("preview_text") or "Payment required."
+            _variant_sections["balanced"]["summary"].set_content(f"**Preview**\n\n{preview}")
+            for sk in list(SECTION_KEYS)[1:]:
+                _variant_sections["balanced"][sk].set_content(random.choice(_RESUME_QUOTES))
             payment_status.set_text("Payment required to reveal the full tailored resume.")
             if show_paywall or body.get("status") == "completed":
                 paywall_dialog.open()
             return body
 
         final_output = body.get("final_output") or {}
-        balanced_output.classes(remove="rb-locked")
+        for _vn in _variant_wrappers:
+            _variant_wrappers[_vn].classes(remove="rb-locked")
 
         # Scores
         match_score = final_output.get("match_score") or {}
@@ -633,7 +707,7 @@ def index_page() -> None:
 
     def _wire_variant_gen_button(variant_name: str) -> None:
         gen_row, gen_btn, gen_status = _variant_gen_rows[variant_name]
-        output_md = _variant_outputs[variant_name]
+        section_mds = _variant_sections[variant_name]
 
         async def _generate() -> None:
             run_id = state.get("run_id")
@@ -650,11 +724,8 @@ def index_page() -> None:
                 data = resp.json()
                 variants = (data.get("final_output") or {}).get("variants") or {}
                 if variant_name in variants:
-                    plain = variants[variant_name].get("plain_text") or ""
-                    output_md.set_content(plain)
                     gen_row.classes(add="hidden")
                     gen_status.set_text("")
-                    # refresh scores too
                     await refresh_run()
                 else:
                     gen_status.set_text("Variant generated — reload to view.")
@@ -736,13 +807,17 @@ def index_page() -> None:
     async def tailor() -> None:
         jd_text = (jd_input.value or "").strip()
         if len(jd_text) < 20:
-            balanced_output.set_content("Job description must be at least 20 characters.")
+            _variant_sections["balanced"]["summary"].set_content(
+                "Job description must be at least 20 characters."
+            )
             return
         if not state.get("resume_id"):
             await load_account()
         resume_id = state.get("resume_id")
         if not resume_id:
-            balanced_output.set_content("Upload a resume before tailoring.")
+            _variant_sections["balanced"]["summary"].set_content(
+                "Upload a resume before tailoring."
+            )
             return
 
         log_console(
@@ -755,10 +830,18 @@ def index_page() -> None:
         progress.value = 0.05
         progress_label.set_text("Creating run")
         payment_status.set_text("")
-        balanced_output.classes(remove="rb-locked")
-        balanced_output.set_content("Starting the tailoring workflow...")
-        conservative_output.set_content("_Will generate after main run…_")
-        bold_output.set_content("_Will generate after main run…_")
+        for _vn in _variant_wrappers:
+            _variant_wrappers[_vn].classes(remove="rb-locked")
+        for _sk in SECTION_KEYS:
+            _variant_sections["balanced"][_sk].set_content(
+                _PLACEHOLDER_LOADING if _sk == "summary" else random.choice(_RESUME_QUOTES)
+            )
+            _variant_sections["conservative"][_sk].set_content(
+                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+            )
+            _variant_sections["bold"][_sk].set_content(
+                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+            )
         conservative_gen_row.classes(add="hidden")
         bold_gen_row.classes(add="hidden")
         score_row.classes(add="hidden")
@@ -779,12 +862,12 @@ def index_page() -> None:
         except RunLaunchError as exc:
             log_console("tailor: run creation failed", level="error", detail=exc.detail)
             run_button.props(remove="loading")
-            balanced_output.set_content(exc.detail)
+            _variant_sections["balanced"]["summary"].set_content(exc.detail)
             return
         except Exception as exc:
             log_console("tailor: unexpected error", level="error", detail=str(exc))
             run_button.props(remove="loading")
-            balanced_output.set_content(f"Could not start run: {exc}")
+            _variant_sections["balanced"]["summary"].set_content(f"Could not start run: {exc}")
             return
 
         log_console("tailor: run created", run_id=data["run_id"], status=data.get("status"))
