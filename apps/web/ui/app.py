@@ -349,7 +349,7 @@ def index_page() -> None:
                                 ("conservative", "Generate Light Touch", "tune",
                                  _PLACEHOLDER_GENERATE),
                                 ("balanced", "Generate Standard Fit", "balance",
-                                 "Upload a resume, paste a job description, then start a tailored run."),
+                                 "Upload a resume, paste a JD, then start a tailored run."),
                                 ("bold", "Generate Bold Match", "bolt",
                                  _PLACEHOLDER_GENERATE),
                             ]
@@ -707,7 +707,6 @@ def index_page() -> None:
 
     def _wire_variant_gen_button(variant_name: str) -> None:
         gen_row, gen_btn, gen_status = _variant_gen_rows[variant_name]
-        section_mds = _variant_sections[variant_name]
 
         async def _generate() -> None:
             run_id = state.get("run_id")
