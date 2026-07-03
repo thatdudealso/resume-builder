@@ -552,15 +552,14 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 
 ---
 
-## 10. Open Feature Branches
+## 10. Merged PRs (history)
 
 | Branch | Scope | Status |
 |--------|-------|--------|
 | `feature/langgraph-postgres-checkpointer` | Postgres checkpointer wired into agent graph | **Merged PR #2** |
 | `feature/nicegui-paywall-polish` | Device fingerprint auth, single-page SSE UX, post-payment polling, export gating | **Merged PR #3** |
-| `fix/resume-generation-quality` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **PR open — 2026-06-28** |
 | `feature/ai-resume-agents` | Multi-provider `AgentService`, section agents, variant schemas | **Merged PR #4** |
-| `feature/ai-resume-ui` | AI resume dashboard (`/app/dashboard`) alongside the single-page workflow | **Merged PR #5** |
+| `feature/ai-resume-ui` | Single-page UI improvements (tabs, score cards, fit panel) | **Merged PR #5** |
 | `feature/stripe-paywall-399` | Repriced unlock from $9.99 to $3.99 | **Merged PR #6** |
 | `feature/merge-input-analysis` | Combined JD+resume analysis into one LLM call | **Merged PR #7** |
 | `feature/faster-llm-models` | Faster default models for every provider | **Merged PR #8** |
@@ -568,14 +567,21 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 | `feature/variant-selector` | Tailoring style (conservative/balanced/bold) selector; single-variant builds by default | **Merged PR #10** |
 | `feature/ui-runtime-fixes` | Upload/progress fixes, Stripe pricing display, Docker fixes | **Merged PR #11** |
 | `fix/submit-analysis-stuck` | Fixed UI submit deadlock (in-process run launch), checkpointer migration on fresh DBs, Stripe verify fallback | **Merged PR #12** |
-| `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, real `verify_docs` drift check in CI | **Not started** — PR #1 closed/abandoned (predates the provider/sections refactor); `schema.sql` still doesn't exist and the migration-doc test is a no-op |
-| `fix/deploy-dev-permissions` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **PR open — #20** |
+| `fix/resume-generation-quality` | 7-node pipeline, JD mirroring, before/after scores, 3-variant UI, fit assessment, style-preserving DOCX export | **Merged PR #20** |
+| `fix/export-download-serve-direct` | Serve export downloads directly instead of redirecting to presigned S3 URL | **Merged PR #21** |
+| `feature/section-copy-ui` | Per-section copy boxes with quirky quotes replacing monolithic output markdown | **Merged PR #22** |
+
+## 10b. Open / Not Started
+
+| Branch | Scope | Status |
+|--------|-------|--------|
+| `feature/database-schema-export` | `docs/database/schema.sql`, ER diagram, real `verify_docs` drift check in CI | **Not started** — `schema.sql` still doesn't exist; migration-doc test is a no-op |
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + `gh` setup script | Not started |
 | `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager | Not started |
 
-**Known doc/code mismatch:** `docs/dev/codex.md` still says the NiceGUI frontend has a single page with no dashboard — that's no longer true; `/app/dashboard` is a real, linked, mounted route since PR #5. `codex.md` needs the same kind of refresh this file just got.
+> **UI architecture note:** The app is single-page only — one `@ui.page("/")` mounted at `/app/`. There is no `/app/dashboard` route. All output, scores, and fit assessment are on the same page. Scores are shown as a teaser even on locked runs using the `ats_score_before`/`ats_score_after` fields returned unconditionally by the API.
 
 ---
 
