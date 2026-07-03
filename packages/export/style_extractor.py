@@ -5,8 +5,10 @@ import io
 from docx import Document
 
 
-def _read_size_pt(run) -> float:
-    return run.font.size.pt
+def _read_size_pt(run: object) -> float:
+    size = getattr(getattr(run, "font", None), "size", None)
+    pt = getattr(size, "pt", None)
+    return float(pt) if isinstance(pt, (int, float)) else 0.0
 
 
 def extract_docx_styles(data: bytes) -> dict[str, object]:
