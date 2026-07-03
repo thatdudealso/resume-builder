@@ -311,6 +311,9 @@ def index_page() -> None:
                     run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
                     progress_label = ui.label("Ready").classes("rb-subtle")
                     progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
+                    new_resume_btn = ui.button(
+                        "New resume", icon="add_circle_outline"
+                    ).props("flat").classes("w-full")
 
                 # ── Right: Output ─────────────────────────────────────────
                 with ui.column().classes("gap-3").style("min-width: 0;"):
@@ -650,7 +653,6 @@ def index_page() -> None:
         is_locked = bool(body.get("output_locked")) and not body.get("final_output")
         if is_locked:
             export_row.classes(add="hidden")
-            score_row.classes(add="hidden")
             fit_panel.classes(add="hidden")
             for _vn in _variant_wrappers:
                 _variant_wrappers[_vn].classes(add="rb-locked")
@@ -659,6 +661,15 @@ def index_page() -> None:
             for sk in list(SECTION_KEYS)[1:]:
                 _variant_sections["balanced"][sk].set_content(random.choice(_RESUME_QUOTES))
             payment_status.set_text("Payment required to reveal the full tailored resume.")
+            # Show scores as a teaser even when locked — API returns these unconditionally
+            _sb = body.get("ats_score_before")
+            _sa = body.get("ats_score_after")
+            if _sb is not None or _sa is not None:
+                score_before_num.set_text(_score_label(_sb))
+                score_after_num.set_text(_score_label(_sa))
+                score_row.classes(remove="hidden")
+            else:
+                score_row.classes(add="hidden")
             if show_paywall or body.get("status") == "completed":
                 paywall_dialog.open()
             return body
@@ -901,6 +912,62 @@ def index_page() -> None:
                     gen_row.classes(remove="hidden")
 
     run_button.on_click(tailor)
+
+    async def new_resume() -> None:
+        # Cancel any pending before-score computation
+        task = state.get("before_score_task")
+        if task and not task.done():
+            task.cancel()
+        # Clear run state; keep resume_id so the same master resume stays selected
+        state.update({
+            "run_id": None,
+            "jd_text": None,
+            "payment_id": None,
+            "poll_payment": False,
+            "section_texts": {},
+            "current_run": None,
+            "cached_before_jd": None,
+            "cached_before_score": None,
+            "before_score_task": None,
+        })
+        await clear_browser_workflow()
+        # Reset input fields
+        jd_input.value = ""
+        upload_status.set_text("")
+        upload_status.classes(remove="rb-danger rb-success")
+        before_card.classes(add="hidden")
+        before_score_num.set_text("—")
+        before_score_sub.set_text("")
+        progress_label.set_text("Ready")
+        progress.value = 0
+        # Reset output panel
+        score_row.classes(add="hidden")
+        score_before_num.set_text("—")
+        score_after_num.set_text("—")
+        fit_panel.classes(add="hidden")
+        fit_bullets_col.clear()
+        export_row.classes(add="hidden")
+        export_row.clear()
+        payment_status.set_text("")
+        paywall_dialog.close()
+        for _vn in _variant_wrappers:
+            _variant_wrappers[_vn].classes(remove="rb-locked")
+        for _sk in SECTION_KEYS:
+            _variant_sections["balanced"][_sk].set_content(
+                "Upload a resume, paste a JD, then start a tailored run."
+                if _sk == "summary" else ""
+            )
+            _variant_sections["conservative"][_sk].set_content(
+                _PLACEHOLDER_GENERATE if _sk == "summary" else ""
+            )
+            _variant_sections["bold"][_sk].set_content(
+                _PLACEHOLDER_GENERATE if _sk == "summary" else ""
+            )
+        for gen_row, _, gen_status in _variant_gen_rows.values():
+            gen_row.classes(add="hidden")
+            gen_status.set_text("")
+
+    new_resume_btn.on_click(new_resume)
 
     async def sync_payment_status() -> bool:
         run_id = state.get("run_id")
