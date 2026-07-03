@@ -8,9 +8,7 @@ from docx import Document
 def _read_size_pt(run: object) -> float:
     size = getattr(getattr(run, "font", None), "size", None)
     pt = getattr(size, "pt", None)
-    if pt is None:
-        return 0.0
-    return float(pt)  # type: ignore[arg-type]
+    return float(pt) if isinstance(pt, (int, float)) else 0.0
 
 
 def extract_docx_styles(data: bytes) -> dict[str, object]:
