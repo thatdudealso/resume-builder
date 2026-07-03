@@ -90,8 +90,10 @@ async def execute_run(
         run.preview_text = (result.get("preview_text") or "")[:500]
         match_before = (result.get("match_score_before") or {}).get("overall")
         match_after = (result.get("match_score_after") or {}).get("overall")
-        run.ats_score_before = Decimal(str(match_before or result.get("ats_score_before", 0)))
-        run.ats_score_after = Decimal(str(match_after or result.get("ats_score_after", 0)))
+        _sb = match_before if match_before is not None else result.get("ats_score_before")
+        _sa = match_after if match_after is not None else result.get("ats_score_after")
+        run.ats_score_before = Decimal(str(_sb)) if _sb is not None else None
+        run.ats_score_after = Decimal(str(_sa)) if _sa is not None else None
         run.output_locked = output_locked
         run.is_free_trial_run = is_free
         run.status = "failed" if result.get("fatal_error") else "completed"
@@ -107,8 +109,12 @@ async def execute_run(
                 payload={
                     "locked": output_locked,
                     "llm_provider": provider_name,
-                    "match_score_before": float(run.ats_score_before),
-                    "match_score_after": float(run.ats_score_after),
+                    "match_score_before": float(run.ats_score_before)
+                    if run.ats_score_before is not None
+                    else None,
+                    "match_score_after": float(run.ats_score_after)
+                    if run.ats_score_after is not None
+                    else None,
                 },
             )
         )
