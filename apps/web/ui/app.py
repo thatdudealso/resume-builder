@@ -1008,13 +1008,19 @@ def index_page() -> None:
         apply_form_from_state()
         if state.get("run_id"):
             if state.get("poll_payment"):
+                # Returning from payment redirect — restore run and unlock output
                 await sync_payment_status()
-            await refresh_run(show_paywall=state.get("poll_payment", False))
-            body = state.get("current_run") or {}
-            if body.get("final_output") or not body.get("output_locked"):
-                state["poll_payment"] = False
-                paywall_dialog.close()
+                await refresh_run(show_paywall=True)
+                body = state.get("current_run") or {}
+                if body.get("final_output") or not body.get("output_locked"):
+                    state["poll_payment"] = False
+                    paywall_dialog.close()
+                    await clear_browser_workflow()
+            else:
+                # Regular page load — start fresh, do not show stale run output or scores
+                state["run_id"] = None
                 await clear_browser_workflow()
+                await schedule_before_score()
 
     ui.timer(0.1, bootstrap_workflow, once=True)
     ui.timer(2.5, poll_after_payment)

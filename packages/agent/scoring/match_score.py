@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from packages.agent.schemas.analysis import JDAnalysis, ResumeAnalysis
 from packages.agent.schemas.match import MatchComponentScore, MatchScoreResult
-from packages.agent.state import score_coverage
+from packages.agent.state import score_coverage as _score_coverage
 
 _SENIORITY_RANK = {
     "junior": 1,
@@ -58,11 +58,22 @@ def _skills_score(jd_analysis: JDAnalysis, resume_analysis: ResumeAnalysis) -> t
     return round(score, 2), f"{req_met}/{len(required) or 0} required skills matched"
 
 
-def _experience_relevance_score(resume_analysis: ResumeAnalysis) -> tuple[float, str]:
+def _experience_relevance_score(
+    jd_analysis: JDAnalysis,
+    resume_analysis: ResumeAnalysis,
+    resume_text: str,
+) -> tuple[float, str]:
     evidence = resume_analysis.requirement_evidence
     if not evidence:
-        bullets = sum(len(role.bullets) for role in resume_analysis.roles)
-        return (70.0 if bullets else 30.0), "Heuristic from role bullets"
+        keywords = [item.term.lower() for item in jd_analysis.keywords_weighted]
+        if not keywords:
+            keywords = [item.requirement.lower() for item in jd_analysis.must_have]
+        if not keywords:
+            return 50.0, "No JD keywords available for scoring"
+        exp_lines = [b for role in resume_analysis.roles for b in role.bullets]
+        exp_text = "\n".join(exp_lines) if exp_lines else resume_text
+        coverage, _ = _score_coverage(exp_text, keywords)
+        return round(coverage, 2), f"Keyword coverage in experience ({len(keywords)} JD terms)"
     met = sum(1 for item in evidence if item.status in ("met", "partial") and item.evidence_quote)
     total = len(evidence)
     score = (met / total) * 100 if total else 0.0
@@ -101,11 +112,11 @@ def compute_match_score(
     keywords = [item.term for item in jd_analysis.keywords_weighted]
     if not keywords:
         keywords = [item.requirement for item in jd_analysis.must_have]
-    ats_score, _gaps = score_coverage(resume_text, [k.lower() for k in keywords])
+    ats_score, _gaps = _score_coverage(resume_text, [k.lower() for k in keywords])
 
     must_score, must_detail = _must_have_score(resume_analysis)
     skills_score, skills_detail = _skills_score(jd_analysis, resume_analysis)
-    exp_score, exp_detail = _experience_relevance_score(resume_analysis)
+    exp_score, exp_detail = _experience_relevance_score(jd_analysis, resume_analysis, resume_text)
     seniority_score, seniority_detail = _seniority_score(jd_analysis, resume_analysis)
 
     components = [
