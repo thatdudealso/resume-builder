@@ -280,10 +280,14 @@ def index_page() -> None:
                     ui.label("Add a PDF, DOCX, or TXT master resume.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("2. Paste the job description").classes("font-medium")
-                    ui.label("Use the role details to guide each tailored variation.").classes("rb-subtle")
+                    ui.label(
+                        "Use the role details to guide each tailored variation."
+                    ).classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("3. Review and export").classes("font-medium")
-                    ui.label("Unlock DOCX/PDF exports when the tailored resume is ready.").classes("rb-subtle")
+                    ui.label(
+                        "Unlock DOCX/PDF exports when the tailored resume is ready."
+                    ).classes("rb-subtle")
 
             with ui.element("section").classes("rb-grid w-full"):
                 # ── Left: Inputs ──────────────────────────────────────────
