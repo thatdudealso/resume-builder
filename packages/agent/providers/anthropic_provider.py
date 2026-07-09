@@ -33,7 +33,7 @@ class AnthropicProvider(LLMProvider):
         if not self.is_configured():
             return mock_complete(task, prompt, json_mode=json_mode)
 
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=90.0)
         system = "Respond with valid JSON only." if json_mode else None
         create_kwargs: dict[str, object] = {
             "model": self.model_for_task(task),
