@@ -729,10 +729,15 @@ def index_page() -> None:
                 return
             gen_btn.props("loading")
             gen_status.set_text("Generating variant...")
-            async with api_client() as client:
-                resp = await client.post(
-                    f"/api/v1/runs/{run_id}/variants/{variant_name}/generate"
-                )
+            try:
+                async with api_client() as client:
+                    resp = await client.post(
+                        f"/api/v1/runs/{run_id}/variants/{variant_name}/generate"
+                    )
+            except Exception as exc:
+                gen_btn.props(remove="loading")
+                gen_status.set_text(f"Generation failed: {exc}")
+                return
             gen_btn.props(remove="loading")
             if resp.status_code == 200:
                 data = resp.json()
