@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from packages.agent.schemas.variants import (
     DEFAULT_VARIANT,
@@ -46,6 +47,52 @@ def _variants_to_build(state: AgentState) -> tuple[VariantName, ...]:
         return (DEFAULT_VARIANT,)
 
 
+def _extract_rewrite_context(
+    state: AgentState,
+) -> tuple[list[str], list[str], list[str]]:
+    """Extract requirement gap lists and priority keywords from state for the rewrite prompt.
+
+    Returns (missing_reqs, met_reqs, priority_keywords).
+    missing_reqs: formatted strings for requirements that are missing or partial.
+    met_reqs: formatted strings for requirements already demonstrated, with evidence.
+    priority_keywords: JD keywords sorted by LLM-assigned weight descending.
+    """
+    resume_analysis: dict[str, Any] = state.get("resume_analysis") or {}
+    jd_analysis: dict[str, Any] = state.get("jd_analysis") or {}
+
+    evidence: list[dict[str, Any]] = [
+        item for item in (resume_analysis.get("requirement_evidence") or [])
+        if isinstance(item, dict)
+    ]
+    missing_reqs: list[str] = []
+    met_reqs: list[str] = []
+
+    for item in evidence:
+        req = item.get("requirement", "")
+        status = item.get("status", "missing")
+        quote = (item.get("evidence_quote") or "").strip()
+        if status == "missing":
+            missing_reqs.append(
+                f"[missing] {req}: no supporting evidence found in source resume"
+            )
+        elif status == "partial":
+            hint = f" (found: '{quote[:80]}')" if quote else ""
+            missing_reqs.append(
+                f"[partial] {req}: mentioned but needs stronger, concrete evidence{hint}"
+            )
+        elif status == "met" and quote:
+            met_reqs.append(f"[met] {req}: '{quote[:100]}'")
+
+    kw_weighted: list[dict[str, Any]] = jd_analysis.get("keywords_weighted") or []
+    priority_keywords = [
+        kw["term"]
+        for kw in sorted(kw_weighted, key=lambda k: k.get("weight", 0.0), reverse=True)
+        if kw.get("term")
+    ]
+
+    return missing_reqs, met_reqs, priority_keywords
+
+
 async def build_all_variants(
     state: AgentState, agent_service: AgentService
 ) -> dict[str, dict[str, str]]:
@@ -53,6 +100,7 @@ async def build_all_variants(
     gaps = state.get("keyword_gaps") or []
     jd = state.get("jd_text", "")
     to_tailor = _sections_to_tailor(state, sources)
+    missing_reqs, met_reqs, priority_kws = _extract_rewrite_context(state)
 
     variants: dict[str, dict[str, str]] = {}
     for variant in _variants_to_build(state):
@@ -67,6 +115,9 @@ async def build_all_variants(
                     variant=variant,
                     jd_text=jd,
                     keyword_gaps=gaps,
+                    missing_requirements=missing_reqs,
+                    met_requirements=met_reqs,
+                    priority_keywords=priority_kws,
                     agent_service=agent_service,
                 )
                 for section, text in to_tailor
@@ -86,6 +137,7 @@ async def retailor_section(
 ) -> dict[str, str]:
     gaps = state.get("keyword_gaps") or []
     jd = state.get("jd_text", "")
+    missing_reqs, met_reqs, priority_kws = _extract_rewrite_context(state)
     updated: dict[str, str] = {}
     for variant in VARIANT_ORDER:
         updated[variant.value] = await rewrite_section(
@@ -94,6 +146,9 @@ async def retailor_section(
             variant=variant,
             jd_text=jd,
             keyword_gaps=gaps,
+            missing_requirements=missing_reqs,
+            met_requirements=met_reqs,
+            priority_keywords=priority_kws,
             agent_service=agent_service,
         )
     return updated

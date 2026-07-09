@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from decimal import Decimal
 from typing import Any, cast
@@ -7,6 +8,7 @@ from typing import Any, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.agent.nodes.format_output import format_output
+from packages.agent.schemas.analysis import JDAnalysis
 from packages.agent.schemas.variants import (
     DEFAULT_VARIANT,
     SECTION_KEYS,
@@ -18,6 +20,8 @@ from packages.agent.state import AgentState, split_sections
 from packages.core.security.sanitization import sanitize_text
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.resume import MasterResume
+
+logger = logging.getLogger(__name__)
 
 
 def _plain_text(sections: dict[str, str]) -> str:
@@ -139,6 +143,14 @@ async def generate_variant(
 
     new_sections = await build_all_variants(state, agent_service)
 
+    jd_analysis_raw = final.get("jd_analysis") or {}
+    jd_obj: JDAnalysis | None = None
+    if jd_analysis_raw:
+        try:
+            jd_obj = JDAnalysis.model_validate(jd_analysis_raw)
+        except Exception:
+            logger.warning("generate_variant: jd_analysis validation failed", exc_info=True)
+
     variants = dict(final.get("variants") or {})
     for vname, sections in new_sections.items():
         parts = [
@@ -149,11 +161,21 @@ async def generate_variant(
         plain = "\n\n".join(parts)
         if header.strip():
             plain = header.strip() + "\n\n" + plain
-        match_after = agent_service.score_match(
-            final.get("jd_analysis") or {},
-            final.get("resume_analysis") or {},
-            plain,
-        ).model_dump()
+        if jd_obj is not None:
+            try:
+                tailored_analysis = await agent_service.analyze_resume(plain, jd_obj)
+                match_after = agent_service.score_match(
+                    jd_obj, tailored_analysis, plain
+                ).model_dump()
+            except Exception:
+                logger.warning("generate_variant: re-analysis failed, falling back", exc_info=True)
+                match_after = agent_service.score_match(
+                    jd_analysis_raw, final.get("resume_analysis") or {}, plain
+                ).model_dump()
+        else:
+            match_after = agent_service.score_match(
+                jd_analysis_raw, final.get("resume_analysis") or {}, plain
+            ).model_dump()
         variants[vname] = {"sections": sections, "plain_text": plain, "match_score": match_after}
 
     final["variants"] = variants
@@ -187,6 +209,8 @@ async def add_section_and_retailor(
     state: AgentState = {
         "jd_text": run.jd_text,
         "keyword_gaps": final.get("keywords_used", []),
+        "jd_analysis": final.get("jd_analysis") or {},
+        "resume_analysis": final.get("resume_analysis") or {},
         "sections_missing": missing,
     }
     retailored = await retailor_section(state, agent_service, section, sanitize_text(content))
