@@ -187,6 +187,8 @@ async def add_section_and_retailor(
     state: AgentState = {
         "jd_text": run.jd_text,
         "keyword_gaps": final.get("keywords_used", []),
+        "jd_analysis": final.get("jd_analysis") or {},
+        "resume_analysis": final.get("resume_analysis") or {},
         "sections_missing": missing,
     }
     retailored = await retailor_section(state, agent_service, section, sanitize_text(content))

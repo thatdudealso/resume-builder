@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -12,11 +13,67 @@ from packages.agent.nodes.prepare_inputs import prepare_inputs
 from packages.agent.nodes.rewrite_sections import rewrite_sections
 from packages.agent.nodes.understand_resume import understand_resume
 from packages.agent.nodes.validate_output import validate_output
+from packages.agent.schemas.analysis import JDAnalysis
 from packages.agent.schemas.variants import DEFAULT_VARIANT
 from packages.agent.service import AgentService
 from packages.agent.state import AgentState
 
+logger = logging.getLogger(__name__)
+
 ProgressCallback = Callable[[dict], Awaitable[None]]
+
+
+async def _rescore_with_tailored_analysis(
+    state: AgentState,
+    agent_service: AgentService,
+) -> AgentState:
+    """Re-analyze the tailored resume text and recompute the after-score.
+
+    Reuses the existing jd_analysis from state (no extra JD LLM call).
+    Only one additional LLM call: analyze_resume on the tailored plain text.
+    """
+    final_output = state.get("final_output") or {}
+    plain = final_output.get("plain_text") or ""
+    jd_analysis_raw = state.get("jd_analysis")
+
+    if not plain or not jd_analysis_raw:
+        return state
+
+    try:
+        jd = JDAnalysis.model_validate(jd_analysis_raw)
+        # Single extra call: re-analyze the tailored text against the already-computed JD analysis
+        tailored_analysis = await agent_service.analyze_resume(plain, jd)
+        match_after = agent_service.score_match(jd, tailored_analysis, plain)
+        after_dict = match_after.model_dump()
+
+        selected = final_output.get("selected_variant") or DEFAULT_VARIANT.value
+        updated_variants = {**final_output.get("variants", {})}
+        if selected in updated_variants:
+            updated_variants[selected] = {
+                **updated_variants[selected],
+                "match_score": after_dict,
+            }
+
+        updated_output = {
+            **final_output,
+            "ats_score_after": after_dict["overall"],
+            "variants": updated_variants,
+            "match_score": {
+                **(final_output.get("match_score") or {}),
+                "current": after_dict,
+                "current_overall": after_dict["overall"],
+            },
+        }
+
+        return {
+            **state,
+            "final_output": updated_output,
+            "ats_score_after": after_dict["overall"],
+            "match_score_after": after_dict,
+        }
+    except Exception:
+        logger.warning("_rescore_with_tailored_analysis failed, keeping original score", exc_info=True)
+        return state
 
 
 def _after_prepare(state: AgentState) -> str:
@@ -88,6 +145,9 @@ def build_graph(
         if on_progress:
             await on_progress({"event": "node_start", "node": "format_output"})
         result = format_output(state, agent_service)
+        # Re-analyze the tailored text for an accurate after-score.
+        # Reuses jd_analysis from state — only one extra LLM call (resume analysis only).
+        result = await _rescore_with_tailored_analysis(result, agent_service)
         if on_progress:
             await on_progress({"event": "node_complete", "node": "format_output"})
         return result
