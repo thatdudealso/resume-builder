@@ -25,16 +25,22 @@ def _source_sections(state: AgentState) -> dict[str, str]:
 
 
 def _sections_to_tailor(state: AgentState, sources: dict[str, str]) -> list[tuple[str, str]]:
-    """Tailor only sections with source content or explicitly user-added sections."""
+    """Tailor sections with source content or explicitly user-added sections.
+
+    Skills is always included even when the source text is empty: many resumes embed
+    skills inside experience bullets so the orchestrator leaves the skills section blank
+    rather than duplicating content. rewrite_section synthesizes a skills section from
+    requirements evidence in that case.
+    """
     user_added = state.get("user_added_sections") or {}
     present = set(state.get("sections_to_tailor") or [])
     tailored: list[tuple[str, str]] = []
 
     for key in SECTION_KEYS:
         text = user_added.get(key) or sources.get(key, "")
-        if not text.strip():
+        if not text.strip() and key != "skills":
             continue
-        if key in user_added or key in present or not present:
+        if key in user_added or key in present or not present or key == "skills":
             tailored.append((key, text))
     return tailored
 

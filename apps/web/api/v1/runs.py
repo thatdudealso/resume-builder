@@ -289,4 +289,12 @@ async def generate_run_variant(
         result = await generate_variant(session, run, resume, variant_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"LLM provider error — try again or switch to a different model."
+                f" ({type(exc).__name__})"
+            ),
+        ) from exc
     return {"run_id": str(run_id), "variant": variant_name, **result}
