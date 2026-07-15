@@ -6,6 +6,7 @@ from uuid import UUID
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi import status as http_status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,14 @@ class CryptoInvoiceRequest(BaseModel):
     pay_currency: str = "btc"
 
 
+def _require_payments_enabled() -> None:
+    if not settings.payments_enabled:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payments are disabled on this server.",
+        )
+
+
 @router.get("/status")
 async def billing_status(
     user: User = Depends(get_current_user),
@@ -61,6 +70,8 @@ async def billing_status(
         "unlocked_runs": [str(r.id) for r in unlocked.scalars().all()],
         "price_usd": settings.run_unlock_price_usd,
         "stripe_configured": is_stripe_configured(),
+        "payments_enabled": settings.payments_enabled,
+        "support_url": settings.support_url,
     }
 
 
@@ -70,6 +81,7 @@ async def stripe_checkout(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
+    _require_payments_enabled()
     run = await session.get(AgentRun, body.run_id)
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -110,6 +122,7 @@ async def stripe_verify(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
+    _require_payments_enabled()
     run = await session.get(AgentRun, body.run_id)
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -136,6 +149,7 @@ async def crypto_invoice(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
+    _require_payments_enabled()
     run = await session.get(AgentRun, body.run_id)
     if run is None or run.user_id != user.id:
         raise HTTPException(status_code=404, detail="Run not found")
