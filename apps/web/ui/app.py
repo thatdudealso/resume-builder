@@ -229,7 +229,6 @@ def _install_page_shell() -> None:
           .q-field__control, .q-textarea .q-field__control { border-radius: 8px; }
           .q-btn.bg-primary { background: var(--rb-accent) !important; }
           .text-primary { color: var(--rb-accent) !important; }
-          .q-field--float .q-field__label { transform: translateY(-40%) scale(0.75); }
           .q-field__control { background: var(--rb-panel); }
           .rb-panel .q-field__control:before { border-color: var(--rb-line); }
           .q-uploader {
@@ -345,7 +344,7 @@ def index_page() -> None:
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
                     provider_select = ui.select(
                         label="AI model", options={}, value=None
-                    ).classes("w-full")
+                    ).props("outlined").classes("w-full")
                     resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
                     upload_status = ui.label("").classes("text-sm")
                     upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
