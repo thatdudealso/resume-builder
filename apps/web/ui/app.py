@@ -94,6 +94,11 @@ def _score_label(score: float | None) -> str:
     return f"{score:.0f}/100"
 
 
+def _billing_shows_payments(billing: dict[str, Any]) -> bool:
+    """Pure gating decision: should the UI show payment controls for this billing status?"""
+    return bool(billing.get("payments_enabled", True))
+
+
 def _install_page_shell() -> None:
     ui.add_head_html(
         """
@@ -259,6 +264,8 @@ def index_page() -> None:
         "before_score_task": None,
         "cached_before_jd": None,
         "cached_before_score": None,
+        "payments_enabled": True,
+        "support_url": "",
     }
 
     with ui.column().classes("rb-page"):
@@ -415,6 +422,8 @@ def index_page() -> None:
                         fit_bullets_col = ui.column().classes("gap-1 mt-2")
 
                     payment_status = ui.label("").classes("rb-subtle")
+                    support_link = ui.link("", "").classes("rb-subtle").style("margin-top:8px;")
+                    support_link.set_visibility(False)
 
     # ── Paywall dialog ─────────────────────────────────────────────────────
     paywall_dialog = ui.dialog()
@@ -488,21 +497,42 @@ def index_page() -> None:
         free_label = "used" if user.get("free_trial_used") else "available"
         upload_label = "yes" if user.get("can_upload") else "payment required"
         price = float(billing.get("price_usd", 3.99))
-        paywall_price.set_text(f"Unlock for {_format_price(price)}")
-        state["stripe_configured"] = billing.get("stripe_configured", False)
-        if not state["stripe_configured"]:
-            stripe_button.props("disable")
-            crypto_status.set_text(
-                "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+        state["payments_enabled"] = _billing_shows_payments(billing)
+        state["support_url"] = billing.get("support_url", "")
+
+        if state["payments_enabled"]:
+            paywall_price.set_visibility(True)
+            paywall_price.set_text(f"Unlock for {_format_price(price)}")
+            stripe_button.set_visibility(True)
+            crypto_button.set_visibility(True)
+            state["stripe_configured"] = billing.get("stripe_configured", False)
+            if not state["stripe_configured"]:
+                stripe_button.props("disable")
+                crypto_status.set_text(
+                    "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+                )
+            else:
+                stripe_button.props(remove="disable")
+                if not state.get("poll_payment"):
+                    crypto_status.set_text("")
+            status_label.set_text(
+                f"Free trial: {free_label} · Upload: {upload_label} · "
+                f"Unlock: {_format_price(price)}"
             )
+            support_link.set_visibility(False)
         else:
-            stripe_button.props(remove="disable")
-            if not state.get("poll_payment"):
-                crypto_status.set_text("")
-        status_label.set_text(
-            f"Free trial: {free_label} · Upload: {upload_label} · "
-            f"Unlock: {_format_price(price)}"
-        )
+            paywall_price.set_visibility(False)
+            stripe_button.set_visibility(False)
+            crypto_button.set_visibility(False)
+            status_label.set_text(f"Free workspace - {free_label} runs")
+            if state["support_url"]:
+                support_link.text = "Built by one developer - support this project"
+                support_link.target = "_blank"
+                support_link._props["href"] = state["support_url"]
+                support_link.update()
+                support_link.set_visibility(True)
+            else:
+                support_link.set_visibility(False)
         if resumes:
             match = None
             if state.get("resume_id"):
@@ -654,7 +684,12 @@ def index_page() -> None:
         state["current_run"] = body
         apply_form_from_state(body)
 
-        is_locked = bool(body.get("output_locked")) and not body.get("final_output")
+        payments_enabled = state.get("payments_enabled", True)
+        is_locked = (
+            payments_enabled
+            and bool(body.get("output_locked"))
+            and not body.get("final_output")
+        )
         if is_locked:
             export_row.classes(add="hidden")
             fit_panel.classes(add="hidden")
@@ -674,7 +709,7 @@ def index_page() -> None:
                 score_row.classes(remove="hidden")
             else:
                 score_row.classes(add="hidden")
-            if show_paywall or body.get("status") == "completed":
+            if payments_enabled and (show_paywall or body.get("status") == "completed"):
                 paywall_dialog.open()
             return body
 
