@@ -28,7 +28,7 @@ async def test_execute_run_completes(session, monkeypatch):
         user_id=user.id,
         master_resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         is_free_trial_run=True,
     )
     session.add(run)
@@ -84,7 +84,7 @@ async def test_execute_run_preserves_unlock_when_payment_window_expires(session,
         user_id=user.id,
         master_resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         output_locked=False,
         is_free_trial_run=False,
     )

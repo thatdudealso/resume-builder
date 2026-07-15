@@ -27,6 +27,7 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
+from packages.agent.schemas.providers import DEFAULT_PROVIDER
 from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS
 
 STEPS = {
@@ -478,15 +479,17 @@ def index_page() -> None:
         async with api_client() as client:
             resp = await client.get("/api/v1/runs/providers")
         if resp.status_code != 200:
-            provider_select.options = {"huggingface": "Hugging Face"}
-            provider_select.value = "huggingface"
+            provider_select.options = {}
+            provider_select.value = None
             return
         providers = resp.json().get("providers", [])
         options = {p["id"]: p["label"] for p in providers if p.get("configured")}
         if not options:
-            options = {"huggingface": "Hugging Face"}
+            provider_select.options = {}
+            provider_select.value = None
+            return
         provider_select.options = options
-        default = next((p["id"] for p in providers if p.get("is_default")), "huggingface")
+        default = next((p["id"] for p in providers if p.get("is_default")), None)
         provider_select.value = default if default in options else next(iter(options))
 
     async def load_account() -> None:
@@ -574,7 +577,7 @@ def index_page() -> None:
             return
         if state.get("cached_before_jd") == jd_text:
             return
-        provider = provider_select.value or "huggingface"
+        provider = provider_select.value or DEFAULT_PROVIDER.value
         async with api_client() as client:
             resp = await client.post(
                 "/api/v1/score/preview",
@@ -886,7 +889,7 @@ def index_page() -> None:
             "tailor: submit clicked",
             resume_id=resume_id,
             jd_chars=len(jd_text),
-            provider=provider_select.value or "huggingface",
+            provider=provider_select.value or DEFAULT_PROVIDER.value,
         )
         run_button.props("loading")
         progress.value = 0.05
@@ -918,7 +921,7 @@ def index_page() -> None:
                     user,
                     resume_id=UUID(str(resume_id)),
                     jd_text=jd_text,
-                    llm_provider=provider_select.value or "huggingface",
+                    llm_provider=provider_select.value or DEFAULT_PROVIDER.value,
                     variant=DEFAULT_VARIANT.value,
                 )
         except RunLaunchError as exc:

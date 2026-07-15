@@ -43,7 +43,7 @@ async def test_understand_resume_structure_fallback_without_llm():
 
 @pytest.mark.asyncio
 async def test_understand_resume_node_updates_state():
-    service = AgentService("huggingface")
+    service = AgentService("openai")
     state = {
         "master_resume_text": RESUME_SAMPLE,
         "master_resume_structured": split_sections(RESUME_SAMPLE),

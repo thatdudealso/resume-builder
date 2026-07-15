@@ -23,7 +23,7 @@ class AgentRun(Base):
     )
     jd_text: Mapped[str] = mapped_column(Text, nullable=False)
     llm_provider: Mapped[str] = mapped_column(
-        String(32), default="huggingface", server_default="huggingface"
+        String(32), default="openai", server_default="openai"
     )
     status: Mapped[str] = mapped_column(String(20), default="queued")
     is_free_trial_run: Mapped[bool] = mapped_column(Boolean, default=False)

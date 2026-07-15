@@ -8,7 +8,6 @@ class LLMProviderName(StrEnum):
     ANTHROPIC = "anthropic"
     GEMINI = "gemini"
     GROK = "grok"
-    HUGGINGFACE = "huggingface"
 
 
 PROVIDER_LABELS: dict[LLMProviderName, str] = {
@@ -16,7 +15,6 @@ PROVIDER_LABELS: dict[LLMProviderName, str] = {
     LLMProviderName.ANTHROPIC: "Anthropic",
     LLMProviderName.GEMINI: "Google Gemini",
     LLMProviderName.GROK: "xAI Grok",
-    LLMProviderName.HUGGINGFACE: "Hugging Face",
 }
 
-DEFAULT_PROVIDER = LLMProviderName.HUGGINGFACE
+DEFAULT_PROVIDER = LLMProviderName.OPENAI

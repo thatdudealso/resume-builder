@@ -13,8 +13,7 @@ from packages.db.models.resume import MasterResume
 async def test_list_llm_providers():
     result = await list_llm_providers()
     ids = {item["id"] for item in result["providers"]}
-    assert "huggingface" in ids
-    assert "openai" in ids
+    assert ids == {"openai", "anthropic", "gemini", "grok"}
 
 
 @pytest.mark.asyncio

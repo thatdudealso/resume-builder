@@ -10,7 +10,7 @@ from packages.agent.service import AgentService
 _INITIAL = {
     "run_id": "r1",
     "user_id": "u1",
-    "llm_provider": "huggingface",
+    "llm_provider": "openai",
     "master_resume_text": (
         "SUMMARY\nEngineer\nEXPERIENCE\nBuilt APIs with Python for 2020-2022.\nSKILLS\nPython, SQL"
     ),
@@ -20,8 +20,12 @@ _INITIAL = {
 
 
 @pytest.mark.asyncio
-async def test_agent_graph_e2e():
-    service = AgentService("huggingface")
+async def test_agent_graph_e2e(monkeypatch):
+    monkeypatch.setattr(
+        "packages.agent.providers.openai_provider.OpenAIProvider.is_configured",
+        lambda self: False,
+    )
+    service = AgentService("openai")
     result = await run_agent(_INITIAL, service)
     assert result.get("final_output")
     assert result.get("validation_passed") is True

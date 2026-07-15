@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_region: str = "us-east-1"
-    hf_token: str = ""
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"

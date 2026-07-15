@@ -11,7 +11,7 @@ def test_parse_json_response_strips_markdown_fence():
 
 
 def test_agent_service_provider_info():
-    service = AgentService("huggingface")
+    service = AgentService("openai")
     info = service.provider_info()
-    assert info["id"] == "huggingface"
+    assert info["id"] == "openai"
     assert info["analysis_model"]
