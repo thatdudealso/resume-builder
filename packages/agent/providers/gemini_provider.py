@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from apps.web.config import settings
@@ -46,14 +48,24 @@ class GeminiProvider(LLMProvider):
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": generation_config,
         }
-        async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(url, json=payload)
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                resp = await client.post(url, json=payload)
+            if resp.status_code == 429 or resp.status_code >= 500:
+                last_exc = RuntimeError(f"Gemini request failed with status {resp.status_code}")
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise last_exc
             try:
                 resp.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                message = f"Gemini request failed with status {exc.response.status_code}"
-                raise RuntimeError(message) from None
+            except httpx.HTTPStatusError:
+                raise RuntimeError(
+                    f"Gemini request failed with status {resp.status_code}"
+                ) from None
             data = resp.json()
+            break
 
         candidates = data.get("candidates") or []
         if not candidates:
