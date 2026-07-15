@@ -108,6 +108,23 @@ def _should_show_support_link(payments_enabled: bool, support_url: str) -> bool:
     return (not payments_enabled) and bool(support_url.strip())
 
 
+_RUN_ERROR_GENERIC = (
+    "The AI provider could not complete this run. Try again or pick another model."
+)
+
+
+def _sanitize_run_error(message: str) -> str:
+    """Pure helper: turn a raw run-error message into a clean, human string.
+
+    Never surfaces raw provider/stack text - long messages or anything that looks
+    like a traceback is replaced with a generic, friendly message.
+    """
+    clean = (message or "").strip() or "Something went wrong generating your resume."
+    if len(clean) > 160 or "Traceback" in clean:
+        return _RUN_ERROR_GENERIC
+    return clean
+
+
 def _install_page_shell() -> None:
     ui.add_head_html(
         """
@@ -275,6 +292,7 @@ def index_page() -> None:
         "cached_before_score": None,
         "payments_enabled": True,
         "support_url": "",
+        "last_error": None,
     }
 
     with ui.column().classes("rb-page"):
@@ -766,6 +784,24 @@ def index_page() -> None:
                 pdf_btn.props("disable")
         return body
 
+    def _show_run_error(message: str) -> None:
+        """Show one clean, human error state after a failed run.
+
+        Resets the progress bar, replaces the status label with a sanitized
+        message, clears any lingering joke-placeholder text from the variant
+        panels, and hides the export row.
+        """
+        clean = _sanitize_run_error(message)
+        progress.value = 0
+        progress_label.set_text("Run failed")
+        payment_status.classes(remove="rb-subtle")
+        payment_status.classes(add="rb-danger")
+        payment_status.set_text(clean)
+        export_row.classes(add="hidden")
+        for _vn in _variant_wrappers:
+            for _sk in SECTION_KEYS:
+                _variant_sections[_vn][_sk].set_content("")
+
     def _wire_variant_gen_button(variant_name: str) -> None:
         gen_row, gen_btn, gen_status = _variant_gen_rows[variant_name]
 
@@ -864,6 +900,7 @@ def index_page() -> None:
 
     async def stream_progress(run_id: str) -> str:
         def _update(label: str, value: float) -> None:
+            state["last_error"] = label
             progress_label.set_text(label)
             progress.value = value
 
@@ -895,6 +932,8 @@ def index_page() -> None:
         progress.value = 0.05
         progress_label.set_text("Creating run")
         payment_status.set_text("")
+        payment_status.classes(remove="rb-danger")
+        payment_status.classes(add="rb-subtle")
         for _vn in _variant_wrappers:
             _variant_wrappers[_vn].classes(remove="rb-locked")
         for _sk in SECTION_KEYS:
@@ -950,7 +989,7 @@ def index_page() -> None:
             )
             log_console("tailor: progress finished", run_id=data["run_id"], result=result)
             if result == "error":
-                await refresh_run(show_paywall=False)
+                _show_run_error(state.get("last_error") or "")
                 return
         finally:
             run_button.props(remove="loading")
@@ -1004,6 +1043,8 @@ def index_page() -> None:
         export_row.classes(add="hidden")
         export_row.clear()
         payment_status.set_text("")
+        payment_status.classes(remove="rb-danger")
+        payment_status.classes(add="rb-subtle")
         paywall_dialog.close()
         for _vn in _variant_wrappers:
             _variant_wrappers[_vn].classes(remove="rb-locked")
