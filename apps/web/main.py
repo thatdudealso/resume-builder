@@ -11,6 +11,7 @@ from apps.web.config import settings
 from apps.web.middleware.device_fingerprint import DeviceFingerprintMiddleware
 from apps.web.middleware.rate_limit import RateLimitMiddleware
 from apps.web.middleware.security_headers import SecurityHeadersMiddleware
+from apps.web.services.s3_bootstrap import ensure_bucket_exists
 from packages.agent.checkpointer import ensure_checkpointer_schema
 
 logging.basicConfig(
@@ -23,6 +24,7 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     if settings.env not in ("test",):
         await ensure_checkpointer_schema(settings.database_url)
+        ensure_bucket_exists()
     yield
 
 
