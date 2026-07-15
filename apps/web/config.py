@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", populate_by_name=True
+    )
 
     env: str = "local"
     database_url: str = "postgresql+asyncpg://resume:resume@localhost:5432/resume_builder"
@@ -35,6 +38,20 @@ class Settings(BaseSettings):
     deployed_at: str = ""
     deploy_env: str = "local"
     run_unlock_price_usd: float = 3.99
+    support_url: str = ""
+    # Empty string = auto-derive from configured payment providers.
+    payments_enabled_override: str = Field(default="", alias="PAYMENTS_ENABLED")
+
+    @property
+    def payments_enabled(self) -> bool:
+        override = self.payments_enabled_override.strip().lower()
+        if override in ("true", "1", "yes"):
+            return True
+        if override in ("false", "0", "no"):
+            return False
+        stripe_ok = bool((self.stripe_secret_key or "").strip())
+        crypto_ok = bool((self.nowpayments_api_key or "").strip())
+        return stripe_ok or crypto_ok
 
     @property
     def cors_origin_list(self) -> list[str]:
