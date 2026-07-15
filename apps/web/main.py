@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.web.api.router import api_router, health_router
 from apps.web.config import settings
+from apps.web.middleware.device_fingerprint import DeviceFingerprintMiddleware
 from apps.web.middleware.rate_limit import RateLimitMiddleware
 from apps.web.middleware.security_headers import SecurityHeadersMiddleware
 from packages.agent.checkpointer import ensure_checkpointer_schema
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(DeviceFingerprintMiddleware)
     app.include_router(api_router)
     app.include_router(health_router)
     return app
