@@ -99,6 +99,14 @@ def _billing_shows_payments(billing: dict[str, Any]) -> bool:
     return bool(billing.get("payments_enabled", True))
 
 
+def _should_show_support_link(payments_enabled: bool, support_url: str) -> bool:
+    """Pure gating decision: should the soft-upsell support link be shown?
+
+    Shows only when payments are disabled AND a non-empty support URL is provided.
+    """
+    return (not payments_enabled) and bool(support_url.strip())
+
+
 def _install_page_shell() -> None:
     ui.add_head_html(
         """
@@ -525,7 +533,7 @@ def index_page() -> None:
             stripe_button.set_visibility(False)
             crypto_button.set_visibility(False)
             status_label.set_text(f"Free workspace - {free_label} runs")
-            if state["support_url"]:
+            if _should_show_support_link(state["payments_enabled"], state["support_url"]):
                 support_link.text = "Built by one developer - support this project"
                 support_link.target = "_blank"
                 support_link._props["href"] = state["support_url"]
