@@ -99,12 +99,20 @@ operators can force it either way.
    server-generated value) so the first `/auth/me` call is authenticated, and keep the JS
    value as a fallback/enrichment. Acceptance: a fresh browser session with no cookies loads
    `/app` and shows account status (free-trial/workspace) with zero 401s and no manual reload.
-2. **Honest provider behavior (HF).** Remove the cross-vendor `_claude_fallback` from
-   `hf_inference.py`. HF retries a bounded number of times with backoff; on exhaustion it
-   raises a provider error that surfaces as a clear user-facing message. No call to Anthropic
-   from the HF path. Mock-completion fallback (offline/no key) stays, since it is clearly
-   labeled and not a different paid vendor. (Confirm the same honesty for any other provider
-   that has a hidden cross-vendor path.)
+2. **Honest provider behavior (HF) + change default to OpenAI.** Remove the cross-vendor
+   `_claude_fallback` from `hf_inference.py`. HF retries a bounded number of times with
+   backoff; on exhaustion it raises a provider error that surfaces as a clear user-facing
+   message. No call to Anthropic from the HF path. Mock-completion fallback (offline/no key)
+   stays, since it is clearly labeled and not a different paid vendor. (Confirm the same
+   honesty for any other provider that has a hidden cross-vendor path.) Additionally, change
+   `DEFAULT_PROVIDER` in `packages/agent/schemas/providers.py` from `HUGGINGFACE` to `OPENAI`,
+   since HF was the flakiest provider (the reason the silent fallback existed) and OpenAI ran
+   cleanly end-to-end. HF remains selectable, just not the default. Acceptance: a fresh page
+   load pre-selects OpenAI in the AI-model dropdown (when configured); the `is_default` flag
+   in `/runs/providers` points at OpenAI. Edge case: if OpenAI is not configured on a given
+   deployment, the dropdown still falls back to the first configured provider (existing UI
+   behavior), and the hardcoded `"huggingface"` fallback string in `app.py`'s `load_providers`
+   is updated to not assume a specific provider is present.
 3. **Gemini retry.** Add the same bounded retry/backoff on 429 and 5xx that the other
    providers use, in `gemini_provider.py` (or a shared helper). Acceptance: a single transient
    429 no longer fails the run.
