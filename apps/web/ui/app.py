@@ -966,12 +966,12 @@ def index_page() -> None:
         except RunLaunchError as exc:
             log_console("tailor: run creation failed", level="error", detail=exc.detail)
             run_button.props(remove="loading")
-            _variant_sections["balanced"]["summary"].set_content(exc.detail)
+            _show_run_error(exc.detail)
             return
         except Exception as exc:
             log_console("tailor: unexpected error", level="error", detail=str(exc))
             run_button.props(remove="loading")
-            _variant_sections["balanced"]["summary"].set_content(f"Could not start run: {exc}")
+            _show_run_error(f"Could not start run: {exc}")
             return
 
         log_console("tailor: run created", run_id=data["run_id"], status=data.get("status"))
