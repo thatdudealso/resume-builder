@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
 from typing import Any
 from uuid import UUID
 
@@ -49,16 +48,7 @@ _SECTION_LABELS: dict[str, str] = {
 
 _PLACEHOLDER_GENERATE = "_Generate this variant after the main run completes._"
 _PLACEHOLDER_LOADING = "Starting the tailoring workflow..."
-
-_RESUME_QUOTES = [
-    "_Your future boss is already impressed — they just haven't read this yet._ 🌟",
-    "_Plot twist: you were qualified the whole time._ 🎭",
-    "_Somewhere, a hiring manager is about to have a really good day._ ☀️",
-    "_Turning your career into a highlight reel, one bullet at a time._ 🎬",
-    "_Even SpongeBob had a resume. Yours is going to be so much better._ 🧽",
-    "_Good things take time. Great tailored resumes take slightly less time._ ⏳",
-    "_Your experience section is about to get a glow-up._ ✨",
-]
+_EMPTY_SECTION = ""
 
 _VERDICT_COLOR = {
     "Strong fit": "#2f6f5f",
@@ -91,7 +81,7 @@ def _format_detail(response_text: str, fallback: str) -> str:
 
 def _score_label(score: float | None) -> str:
     if score is None:
-        return "—"
+        return "-"
     return f"{score:.0f}/100"
 
 
@@ -239,6 +229,31 @@ def _install_page_shell() -> None:
           .q-field__control, .q-textarea .q-field__control { border-radius: 8px; }
           .q-btn.bg-primary { background: var(--rb-accent) !important; }
           .text-primary { color: var(--rb-accent) !important; }
+          .q-field--float .q-field__label { transform: translateY(-40%) scale(0.75); }
+          .q-field__control { background: var(--rb-panel); }
+          .rb-panel .q-field__control:before { border-color: var(--rb-line); }
+          .q-uploader {
+            box-shadow: none;
+            border: 1px dashed var(--rb-line);
+            border-radius: 8px;
+            background: var(--rb-panel);
+          }
+          .q-uploader__header {
+            background: var(--rb-panel);
+            color: var(--rb-ink);
+            box-shadow: none;
+            border-bottom: 1px solid var(--rb-line);
+          }
+          .q-uploader__title { font-size: 13px; }
+          .q-uploader__subtitle { color: var(--rb-muted); }
+          .q-uploader__list { background: var(--rb-panel); }
+          .q-uploader .q-btn.bg-primary {
+            background: transparent !important;
+            color: var(--rb-muted) !important;
+          }
+          .q-uploader .q-uploader__header .q-btn { color: var(--rb-muted) !important; }
+          .q-uploader .q-uploader__file--uploaded .q-icon { color: var(--rb-accent); }
+          .q-linear-progress { color: var(--rb-accent); }
           @media (max-width: 900px) {
             .rb-page { padding: 18px; }
             .rb-grid, .rb-proof, .rb-score-row { grid-template-columns: 1fr; }
@@ -343,7 +358,7 @@ def index_page() -> None:
                     # Before-score card (hidden until data available)
                     with ui.element("div").classes("rb-score-card hidden") as before_card:
                         ui.label("Pre-run fit estimate").classes("rb-score-label")
-                        before_score_num = ui.label("—").classes("rb-score-num")
+                        before_score_num = ui.label("-").classes("rb-score-num")
                         before_score_sub = ui.label("").classes("rb-subtle text-xs")
 
                     run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
@@ -360,10 +375,10 @@ def index_page() -> None:
                     with ui.element("div").classes("rb-score-row hidden") as score_row:
                         with ui.element("div").classes("rb-score-card"):
                             ui.label("Before tailoring").classes("rb-score-label")
-                            score_before_num = ui.label("—").classes("rb-score-num")
+                            score_before_num = ui.label("-").classes("rb-score-num")
                         with ui.element("div").classes("rb-score-card"):
                             ui.label("After tailoring").classes("rb-score-label")
-                            score_after_num = ui.label("—").classes("rb-score-num")
+                            score_after_num = ui.label("-").classes("rb-score-num")
 
                     # Variant tabs
                     with ui.card().classes("w-full p-0").style(
@@ -606,7 +621,7 @@ def index_page() -> None:
             overall = data.get("overall")
             if overall is not None:
                 before_score_num.set_text(f"{overall:.0f}")
-                before_score_sub.set_text("out of 100 — before tailoring")
+                before_score_sub.set_text("out of 100 - before tailoring")
                 before_card.classes(remove="hidden")
                 state["cached_before_score"] = overall
                 state["cached_before_jd"] = jd_text
@@ -678,7 +693,7 @@ def index_page() -> None:
                 gen_row.classes(add="hidden")
             else:
                 for md in section_mds.values():
-                    md.set_content(random.choice(_RESUME_QUOTES))
+                    md.set_content(_EMPTY_SECTION)
                 gen_row.classes(remove="hidden")
 
     def _display_fit_assessment(final_output: dict) -> None:
@@ -727,9 +742,9 @@ def index_page() -> None:
             preview = body.get("preview_text") or "Payment required."
             _variant_sections["balanced"]["summary"].set_content(f"**Preview**\n\n{preview}")
             for sk in list(SECTION_KEYS)[1:]:
-                _variant_sections["balanced"][sk].set_content(random.choice(_RESUME_QUOTES))
+                _variant_sections["balanced"][sk].set_content(_EMPTY_SECTION)
             payment_status.set_text("Payment required to reveal the full tailored resume.")
-            # Show scores as a teaser even when locked — API returns these unconditionally
+            # Show scores as a teaser even when locked - API returns these unconditionally
             _sb = body.get("ats_score_before")
             _sa = body.get("ats_score_after")
             if _sb is not None or _sa is not None:
@@ -757,7 +772,7 @@ def index_page() -> None:
             # update before card in inputs panel too
             if score_before_val is not None:
                 before_score_num.set_text(f"{score_before_val:.0f}")
-                before_score_sub.set_text("out of 100 — before tailoring")
+                before_score_sub.set_text("out of 100 - before tailoring")
                 before_card.classes(remove="hidden")
 
         # Variant outputs
@@ -829,7 +844,7 @@ def index_page() -> None:
                     gen_status.set_text("")
                     await refresh_run()
                 else:
-                    gen_status.set_text("Variant generated — reload to view.")
+                    gen_status.set_text("Variant generated - reload to view.")
             else:
                 gen_status.set_text(_format_detail(resp.text, "Generation failed"))
 
@@ -938,13 +953,13 @@ def index_page() -> None:
             _variant_wrappers[_vn].classes(remove="rb-locked")
         for _sk in SECTION_KEYS:
             _variant_sections["balanced"][_sk].set_content(
-                _PLACEHOLDER_LOADING if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_LOADING if _sk == "summary" else _EMPTY_SECTION
             )
             _variant_sections["conservative"][_sk].set_content(
-                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_GENERATE if _sk == "summary" else _EMPTY_SECTION
             )
             _variant_sections["bold"][_sk].set_content(
-                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_GENERATE if _sk == "summary" else _EMPTY_SECTION
             )
         conservative_gen_row.classes(add="hidden")
         bold_gen_row.classes(add="hidden")
@@ -1030,14 +1045,14 @@ def index_page() -> None:
         upload_status.set_text("")
         upload_status.classes(remove="rb-danger rb-success")
         before_card.classes(add="hidden")
-        before_score_num.set_text("—")
+        before_score_num.set_text("-")
         before_score_sub.set_text("")
         progress_label.set_text("Ready")
         progress.value = 0
         # Reset output panel
         score_row.classes(add="hidden")
-        score_before_num.set_text("—")
-        score_after_num.set_text("—")
+        score_before_num.set_text("-")
+        score_after_num.set_text("-")
         fit_panel.classes(add="hidden")
         fit_bullets_col.clear()
         export_row.classes(add="hidden")
@@ -1100,7 +1115,7 @@ def index_page() -> None:
         apply_form_from_state()
         if state.get("run_id"):
             if state.get("poll_payment"):
-                # Returning from payment redirect — restore run and unlock output
+                # Returning from payment redirect - restore run and unlock output
                 await sync_payment_status()
                 await refresh_run(show_paywall=True)
                 body = state.get("current_run") or {}
@@ -1109,7 +1124,7 @@ def index_page() -> None:
                     paywall_dialog.close()
                     await clear_browser_workflow()
             else:
-                # Regular page load — start fresh, do not show stale run output or scores
+                # Regular page load - start fresh, do not show stale run output or scores
                 state["run_id"] = None
                 await clear_browser_workflow()
                 await schedule_before_score()
