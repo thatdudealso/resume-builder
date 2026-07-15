@@ -6,7 +6,6 @@ import time
 import httpx
 
 from apps.web.config import settings
-from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL
 
 _circuit_open_until: float = 0.0
 _failure_count: int = 0
@@ -19,7 +18,9 @@ class HFInferenceError(Exception):
 async def complete(*, model: str, prompt: str, node: str) -> str:
     global _circuit_open_until, _failure_count
     if time.time() < _circuit_open_until:
-        return await _claude_fallback(prompt, node)
+        if not settings.hf_token:
+            return await _mock_response(prompt, node)
+        raise HFInferenceError("Hugging Face temporarily unavailable")
 
     if not settings.hf_token:
         return await _mock_response(prompt, node)
@@ -50,26 +51,13 @@ async def complete(*, model: str, prompt: str, node: str) -> str:
             if _failure_count >= 5:
                 _circuit_open_until = time.time() + 60
             if attempt == 2:
-                return await _claude_fallback(prompt, node)
+                if not settings.hf_token:
+                    return await _mock_response(prompt, node)
+                raise HFInferenceError("Hugging Face inference failed after retries")
             await asyncio.sleep(2**attempt)
-    return await _claude_fallback(prompt, node)
-
-
-async def _claude_fallback(prompt: str, node: str) -> str:
-    if not settings.anthropic_api_key:
+    if not settings.hf_token:
         return await _mock_response(prompt, node)
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    msg = await client.messages.create(
-        model=ANTHROPIC_OPUS_MODEL,
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    block = msg.content[0]
-    if hasattr(block, "text"):
-        return block.text
-    return str(block)
+    raise HFInferenceError("Hugging Face inference failed after retries")
 
 
 async def _mock_response(prompt: str, node: str) -> str:
