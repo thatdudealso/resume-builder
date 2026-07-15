@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from packages.agent.providers.base import AgentTask, LLMProvider
 from packages.agent.schemas.analysis import (
     JDAnalysis,
@@ -9,6 +11,8 @@ from packages.agent.schemas.analysis import (
 )
 from packages.agent.state import split_sections
 from packages.agent.utils.json_parse import parse_json_response
+
+logger = logging.getLogger(__name__)
 
 _SECTION_KEYS = ("summary", "experience", "skills", "education")
 
@@ -97,9 +101,16 @@ async def analyze_resume(
         resume_text=resume_text[:12000],
     )
     if provider.is_configured():
+        raw = None
         try:
             raw = await provider.complete(AgentTask.RESUME_ANALYSIS, prompt, json_mode=True)
             return ResumeAnalysis.model_validate(parse_json_response(raw))
         except Exception:
-            pass
+            snippet = (raw or "")[:500]
+            logger.warning(
+                "analyze_resume: LLM response rejected, falling back to heuristic analysis. "
+                "raw_snippet=%r",
+                snippet,
+                exc_info=True,
+            )
     return fallback_resume_analysis(resume_text, jd_analysis)

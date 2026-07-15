@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class WeightedKeyword(BaseModel):
@@ -10,9 +10,35 @@ class WeightedKeyword(BaseModel):
     weight: float = Field(ge=0.0, le=1.0)
 
 
+def _normalize_category(value: object) -> str:
+    """Map free-form LLM category strings onto the canonical category set.
+
+    LLMs return descriptive categories like "technical skill" or "soft skill" instead
+    of the strict enum value "skill". Normalize by substring match so scoring (which
+    filters on category == "skill") still recognizes them.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return "other"
+    lowered = value.strip().lower()
+    if "skill" in lowered:
+        return "skill"
+    if "cert" in lowered:
+        return "cert"
+    if "educ" in lowered or "degree" in lowered:
+        return "education"
+    if "year" in lowered:
+        return "years"
+    return "other"
+
+
 class JDRequirement(BaseModel):
     requirement: str
     category: Literal["skill", "cert", "education", "years", "other"] = "other"
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _coerce_category(cls, value: object) -> str:
+        return _normalize_category(value)
 
 
 class JDAnalysis(BaseModel):

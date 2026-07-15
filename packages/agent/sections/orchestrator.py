@@ -24,13 +24,20 @@ def _source_sections(state: AgentState) -> dict[str, str]:
     return sources
 
 
-def _sections_to_tailor(state: AgentState, sources: dict[str, str]) -> list[tuple[str, str]]:
+def _sections_to_tailor(
+    state: AgentState,
+    sources: dict[str, str],
+    met_reqs: list[str],
+    priority_kws: list[str],
+) -> list[tuple[str, str]]:
     """Tailor sections with source content or explicitly user-added sections.
 
-    Skills is always included even when the source text is empty: many resumes embed
-    skills inside experience bullets so the orchestrator leaves the skills section blank
-    rather than duplicating content. rewrite_section synthesizes a skills section from
-    requirements evidence in that case.
+    Skills is included even when the source text is empty, but only when there is
+    something to synthesize from: many resumes embed skills inside experience bullets
+    so the orchestrator leaves the skills section blank rather than duplicating content.
+    rewrite_section synthesizes a skills section from requirements evidence or priority
+    keywords in that case. If neither is available, skills has nothing to build from and
+    is omitted entirely.
     """
     user_added = state.get("user_added_sections") or {}
     present = set(state.get("sections_to_tailor") or [])
@@ -38,9 +45,10 @@ def _sections_to_tailor(state: AgentState, sources: dict[str, str]) -> list[tupl
 
     for key in SECTION_KEYS:
         text = user_added.get(key) or sources.get(key, "")
-        if not text.strip() and key != "skills":
+        can_synthesize_skills = key == "skills" and bool(text.strip() or met_reqs or priority_kws)
+        if not text.strip() and not can_synthesize_skills:
             continue
-        if key in user_added or key in present or not present or key == "skills":
+        if key in user_added or key in present or not present or can_synthesize_skills:
             tailored.append((key, text))
     return tailored
 
@@ -105,8 +113,8 @@ async def build_all_variants(
     sources = _source_sections(state)
     gaps = state.get("keyword_gaps") or []
     jd = state.get("jd_text", "")
-    to_tailor = _sections_to_tailor(state, sources)
     missing_reqs, met_reqs, priority_kws = _extract_rewrite_context(state)
+    to_tailor = _sections_to_tailor(state, sources, met_reqs, priority_kws)
 
     variants: dict[str, dict[str, str]] = {}
     for variant in _variants_to_build(state):
@@ -130,7 +138,9 @@ async def build_all_variants(
             ]
         )
         variants[variant.value] = {
-            section: result for (section, _), result in zip(to_tailor, results, strict=True)
+            section: result
+            for (section, _), result in zip(to_tailor, results, strict=True)
+            if result.strip()
         }
     return variants
 
