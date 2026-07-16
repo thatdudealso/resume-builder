@@ -1,5 +1,6 @@
-import pytest
 import httpx
+import pytest
+
 from packages.agent.providers.gemini_provider import GeminiProvider
 
 

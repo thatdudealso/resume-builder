@@ -119,9 +119,8 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `S3_BUCKET` | Yes | Bucket name, default `resume-builder` |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Yes | MinIO: `minioadmin` / `minioadmin` |
 | `S3_REGION` | No | Default `us-east-1` |
-| `HF_TOKEN` | Recommended | Hugging Face Inference API token (default provider) |
+| `OPENAI_API_KEY` | Recommended | OpenAI (default provider; `OPENAI_BASE_URL` defaults to OpenAI API) |
 | `ANTHROPIC_API_KEY` | Optional | Anthropic Claude |
-| `OPENAI_API_KEY` | Optional | OpenAI (`OPENAI_BASE_URL` defaults to OpenAI API) |
 | `GEMINI_API_KEY` | Optional | Google Gemini |
 | `XAI_API_KEY` | Optional | xAI Grok (`XAI_BASE_URL` configurable) |
 | `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
@@ -130,6 +129,8 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `STRIPE_PRICE_ID` | Unused | Legacy; checkout uses `RUN_UNLOCK_PRICE_USD` |
 | `NOWPAYMENTS_API_KEY` | Optional | Crypto payments via NOWPayments |
 | `NOWPAYMENTS_IPN_SECRET` | Optional | NOWPayments IPN HMAC secret |
+| `PAYMENTS_ENABLED` | No | `true`/`false` to force payments on/off. Empty (default) auto-derives: on when Stripe or NOWPayments keys are set, otherwise off |
+| `SUPPORT_URL` | No | When payments are off, shows a single subtle support link pointing here |
 | `RUN_UNLOCK_PRICE_USD` | No | Display/checkout amount. Default: `3.99` |
 
 Never commit `.env` or real API keys to git.
@@ -183,21 +184,20 @@ Interactive API docs: http://localhost:8000/docs
 
 ## LLM providers
 
-Supported providers (selectable on `/app` and the dashboard; default is Hugging Face):
+Supported providers (selectable on `/app` and the dashboard; default is OpenAI):
 
 | Provider | Env var | Notes |
 |----------|---------|-------|
-| Hugging Face | `HF_TOKEN` | Default; uses Inference API models |
-| OpenAI | `OPENAI_API_KEY` | GPT-4o family |
+| OpenAI | `OPENAI_API_KEY` | Default; GPT-4o family |
 | Anthropic | `ANTHROPIC_API_KEY` | Claude |
 | Google Gemini | `GEMINI_API_KEY` | |
 | xAI Grok | `XAI_API_KEY` | |
 
 If a provider’s API key is missing, the agent uses deterministic mock completions so the app still runs locally — useful for UI testing, not for real tailoring.
 
-**Minimum for real runs:** set `HF_TOKEN` (or configure another provider and choose it on the dashboard).
+**Minimum for real runs:** set `OPENAI_API_KEY` (or configure another provider and choose it on the dashboard).
 
-Get a Hugging Face token: https://huggingface.co/settings/tokens
+Get an OpenAI API key: https://platform.openai.com/api-keys
 
 ---
 
@@ -357,7 +357,7 @@ ENV=test \
   DATABASE_URL=postgresql+asyncpg://resume:resume@localhost:5432/resume_builder_test \
   REDIS_URL=redis://localhost:6379/1 \
   JWT_SECRET=test-secret-key-minimum-32-characters-long \
-  HF_TOKEN=test ANTHROPIC_API_KEY=test OPENAI_API_KEY= \
+  OPENAI_API_KEY=test ANTHROPIC_API_KEY=test \
   STRIPE_SECRET_KEY=sk_test_fake STRIPE_WEBHOOK_SECRET=whsec_test \
   NOWPAYMENTS_API_KEY=test NOWPAYMENTS_IPN_SECRET=test \
   PYTHONPATH=. \
@@ -428,7 +428,7 @@ Engineering plans and status (private dev docs) live on `develop` under `docs/de
 
 ### Agent runs complete but output looks like placeholder text
 
-- No LLM API key is configured. Add `HF_TOKEN` or another provider key and restart.
+- No LLM API key is configured. Add `OPENAI_API_KEY` or another provider key and restart.
 - On the dashboard, confirm the selected provider is configured.
 
 ### Paywall does not unlock after Stripe payment

@@ -72,7 +72,9 @@ async def _rescore_with_tailored_analysis(
             "match_score_after": after_dict,
         }
     except Exception:
-        logger.warning("_rescore_with_tailored_analysis failed, keeping original score", exc_info=True)
+        logger.warning(
+            "_rescore_with_tailored_analysis failed, keeping original score", exc_info=True
+        )
         return state
 
 

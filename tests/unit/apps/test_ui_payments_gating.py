@@ -18,7 +18,10 @@ def test_defaults_to_showing_payments_when_field_missing():
 
 
 def test_support_link_hidden_when_payments_enabled():
-    assert _should_show_support_link(payments_enabled=True, support_url="https://example.com") is False
+    assert (
+        _should_show_support_link(payments_enabled=True, support_url="https://example.com")
+        is False
+    )
 
 
 def test_support_link_hidden_when_payments_disabled_but_no_url():
@@ -30,4 +33,7 @@ def test_support_link_hidden_when_payments_disabled_but_whitespace_url():
 
 
 def test_support_link_shown_when_payments_disabled_and_url_provided():
-    assert _should_show_support_link(payments_enabled=False, support_url="https://example.com") is True
+    assert (
+        _should_show_support_link(payments_enabled=False, support_url="https://example.com")
+        is True
+    )

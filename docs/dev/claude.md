@@ -7,7 +7,7 @@
 
 ## 1. What This App Does
 
-Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, picks a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok/HuggingFace), then gets three tailored resume variations with JD-mirrored language, before/after job-fit scores, and LLM coaching bullets. No hallucinated facts.
+Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, picks a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok), then gets three tailored resume variations with JD-mirrored language, before/after job-fit scores, and LLM coaching bullets. No hallucinated facts.
 
 **Free trial:** 1 resume upload + 1 JD run → full visible output.
 **All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$3.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
@@ -80,7 +80,6 @@ resume-builder/
 │   │   │   ├── openai_provider.py     # gpt-4o (rewrite), gpt-4o-mini (analysis)
 │   │   │   ├── gemini_provider.py     # gemini-3.5-flash (all tasks)
 │   │   │   ├── grok_provider.py       # grok-4.3 (all tasks)
-│   │   │   ├── huggingface_provider.py # Llama-3.3-70B-Instruct (all tasks)
 │   │   │   └── _http.py, _mock.py   # shared HTTP client + test mock provider
 │   │   ├── schemas/
 │   │   │   ├── fit_assessment.py    # FitAssessment(verdict, coaching_bullets)
@@ -129,7 +128,6 @@ resume-builder/
 │   │   └── style_extractor.py       # Extract font/size/spacing from uploaded DOCX
 │   │
 │   └── integrations/
-│       ├── hf_inference.py          # HF Inference API client (rewrite + validate nodes)
 │       ├── stripe_client.py         # Stripe checkout session creation
 │       ├── s3_storage.py            # boto3 S3 upload/presign
 │       └── crypto/
@@ -269,9 +267,8 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 | `JWT_SECRET` | 32+ random chars | |
 | `JWT_ACCESS_EXPIRE_MINUTES` | `15` | |
 | `JWT_REFRESH_EXPIRE_DAYS` | `7` | |
-| `HF_TOKEN` | `hf_...` | HuggingFace Inference API provider |
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | Anthropic provider |
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` | `sk-...` | OpenAI provider (default provider) |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Anthropic provider |
 | `GEMINI_API_KEY` | | Gemini provider |
 | `XAI_API_KEY` / `XAI_BASE_URL` | | Grok provider |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | |
@@ -280,6 +277,8 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 | `STRIPE_PRICE_ID` | `price_...` | One-time $3.99 |
 | `NOWPAYMENTS_API_KEY` | | |
 | `NOWPAYMENTS_IPN_SECRET` | | HMAC secret |
+| `PAYMENTS_ENABLED` | `true \| false` | Empty auto-derives from Stripe/NOWPayments keys |
+| `SUPPORT_URL` | `https://...` | Shown as one subtle support link when payments are off |
 | `S3_ENDPOINT` | `http://minio:9000` | Empty = AWS S3 |
 | `S3_BUCKET` | `resume-builder` | |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | | |
@@ -418,7 +417,7 @@ prepare_inputs ──→ understand_resume ──→ analyze_inputs ──→ re
 - Max retry loop: `retry_count < 2` in `_after_validate()`
 - `assess_fit` runs **after** `format_output` — never inside it (format_output re-runs on section edits)
 - `_variants_to_build()` returns **only the selected variant** — other variants are on-demand via `POST /runs/{run_id}/variants/{name}/generate`
-- All LLM calls go through `AgentService`, which wraps whichever `LLMProvider` was selected (OpenAI/Anthropic/Gemini/Grok/HuggingFace) — there is no single hardcoded model anymore
+- All LLM calls go through `AgentService`, which wraps whichever `LLMProvider` was selected (OpenAI/Anthropic/Gemini/Grok) — there is no single hardcoded model anymore
 
 ### Key function signatures
 
@@ -454,15 +453,14 @@ async with get_checkpointer(settings.database_url) as checkpointer:
 
 ### LLM Providers
 
-5 providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes.
+4 providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes.
 
 | Provider | Model used |
 |----------|-----------|
-| Anthropic | `claude-opus-4-8` (all tasks) |
 | OpenAI | `gpt-4o` (SECTION_REWRITE), `gpt-4o-mini` (all others) |
+| Anthropic | `claude-opus-4-8` (all tasks) |
 | Gemini | `gemini-3.5-flash` (all tasks) |
 | Grok | `grok-4.3` (all tasks) |
-| HuggingFace | `meta-llama/Llama-3.3-70B-Instruct` (all tasks) |
 
 `AgentTask` enum members: `RESUME_ORCHESTRATION`, `INPUT_ANALYSIS`, `JD_ANALYSIS`, `RESUME_ANALYSIS`, `SECTION_REWRITE`, `VALIDATION`, `FIT_ASSESSMENT`. **All providers must map every task.**
 

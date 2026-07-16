@@ -570,7 +570,7 @@ def index_page() -> None:
             status_label.set_text(f"Free workspace - {free_label} runs")
             if _should_show_support_link(state["payments_enabled"], state["support_url"]):
                 support_link.text = "Built by one developer - support this project"
-                support_link.target = "_blank"
+                support_link._props["target"] = "_blank"
                 support_link._props["href"] = state["support_url"]
                 support_link.update()
                 support_link.set_visibility(True)

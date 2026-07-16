@@ -10,11 +10,6 @@ from packages.agent.utils.json_parse import parse_json_response
 
 logger = logging.getLogger(__name__)
 
-_STOPWORDS = {
-    "between", "against", "within", "across", "customer", "technical", "using",
-    "their", "there", "would", "could", "should", "about",
-}
-
 JD_ANALYST_PROMPT = """Analyze this job description and return JSON only with keys:
 must_have (list of {{requirement, category}}), nice_to_have (same shape),
 role_type (ic|manager|hybrid|unknown), seniority_level (junior|mid|senior|lead|executive|unknown),
@@ -28,9 +23,7 @@ Job description:
 
 def fallback_jd_analysis(jd_text: str) -> JDAnalysis:
     keywords = extract_keywords(jd_text)
-    requirement_terms = [
-        term for term in keywords if len(term) >= 4 and term not in _STOPWORDS
-    ]
+    requirement_terms = list(keywords)
     weighted = [
         WeightedKeyword(term=term, weight=max(0.3, 1.0 - index * 0.05))
         for index, term in enumerate(keywords[:15])
