@@ -8,7 +8,7 @@ Upload a master resume, paste a job description, and get three tailored variatio
 
 ## Why it's different
 
-Most "AI resume tailoring" tools rewrite freely and let the model pad in skills or metrics you never had. ResumeBild's agents stay grounded in your real experience - they rephrase, reorder, and emphasize what's already there instead of fabricating roles, skills, or numbers. The result is one honest, ATS-friendly resume per application, not a generic one sent everywhere.
+Most "AI resume tailoring" tools rewrite freely and let the model pad in skills or metrics you never had. ResumeBild's agents stay grounded in your real experience - they rephrase, reorder, and emphasize what's already there instead of fabricating roles, skills, or numbers. The result is three honest, ATS-friendly options for each application, not a generic one sent everywhere.
 
 - **Free to use.** Payment is an optional gesture to support server costs, never a requirement.
 - **Your model, your choice.** Pick the AI provider in the UI; only the providers you've configured show up.
