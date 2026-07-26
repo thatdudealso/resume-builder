@@ -75,7 +75,8 @@ def _extract_rewrite_context(
     jd_analysis: dict[str, Any] = state.get("jd_analysis") or {}
 
     evidence: list[dict[str, Any]] = [
-        item for item in (resume_analysis.get("requirement_evidence") or [])
+        item
+        for item in (resume_analysis.get("requirement_evidence") or [])
         if isinstance(item, dict)
     ]
     missing_reqs: list[str] = []
@@ -86,9 +87,7 @@ def _extract_rewrite_context(
         status = item.get("status", "missing")
         quote = (item.get("evidence_quote") or "").strip()
         if status == "missing":
-            missing_reqs.append(
-                f"[missing] {req}: no supporting evidence found in source resume"
-            )
+            missing_reqs.append(f"[missing] {req}: no supporting evidence found in source resume")
         elif status == "partial":
             hint = f" (found: '{quote[:80]}')" if quote else ""
             missing_reqs.append(

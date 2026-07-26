@@ -55,7 +55,7 @@ class GeminiProvider(LLMProvider):
             if resp.status_code == 429 or resp.status_code >= 500:
                 last_exc = RuntimeError(f"Gemini request failed with status {resp.status_code}")
                 if attempt < 2:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise last_exc
             try:

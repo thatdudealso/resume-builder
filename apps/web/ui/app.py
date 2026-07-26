@@ -319,30 +319,34 @@ def index_page() -> None:
                     ui.label("Add a PDF, DOCX, or TXT master resume.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("2. Paste the job description").classes("font-medium")
-                    ui.label(
-                        "Use the role details to guide each tailored variation."
-                    ).classes("rb-subtle")
+                    ui.label("Use the role details to guide each tailored variation.").classes(
+                        "rb-subtle"
+                    )
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("3. Review and export").classes("font-medium")
-                    ui.label(
-                        "Unlock DOCX/PDF exports when the tailored resume is ready."
-                    ).classes("rb-subtle")
+                    ui.label("Unlock DOCX/PDF exports when the tailored resume is ready.").classes(
+                        "rb-subtle"
+                    )
 
             with ui.element("section").classes("rb-grid w-full"):
                 # ── Left: Inputs ──────────────────────────────────────────
                 with ui.column().classes("rb-panel gap-4"):
                     ui.label("Inputs").classes("rb-section-title")
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
-                    provider_select = ui.select(
-                        label="AI model", options={}, value=None
-                    ).props("outlined").classes("w-full")
+                    provider_select = (
+                        ui.select(label="AI model", options={}, value=None)
+                        .props("outlined")
+                        .classes("w-full")
+                    )
                     resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
                     upload_status = ui.label("").classes("text-sm")
-                    upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
-                        "w-full"
+                    upload = (
+                        ui.upload(auto_upload=True)
+                        .props("accept=.pdf,.txt,.docx")
+                        .classes("w-full")
                     )
-                    jd_input = ui.textarea("Job description").props("outlined autogrow").classes(
-                        "w-full"
+                    jd_input = (
+                        ui.textarea("Job description").props("outlined autogrow").classes("w-full")
                     )
 
                     # Before-score card (hidden until data available)
@@ -354,13 +358,14 @@ def index_page() -> None:
                     run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
                     progress_label = ui.label("Ready").classes("rb-subtle")
                     progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
-                    new_resume_btn = ui.button(
-                        "New resume", icon="add_circle_outline"
-                    ).props("flat").classes("w-full")
+                    new_resume_btn = (
+                        ui.button("New resume", icon="add_circle_outline")
+                        .props("flat")
+                        .classes("w-full")
+                    )
 
                 # ── Right: Output ─────────────────────────────────────────
                 with ui.column().classes("gap-3").style("min-width: 0;"):
-
                     # Score comparison row (hidden until run complete)
                     with ui.element("div").classes("rb-score-row hidden") as score_row:
                         with ui.element("div").classes("rb-score-card"):
@@ -371,10 +376,12 @@ def index_page() -> None:
                             score_after_num = ui.label("-").classes("rb-score-num")
 
                     # Variant tabs
-                    with ui.card().classes("w-full p-0").style(
-                        "border:1px solid var(--rb-line);"
-                        "border-radius:10px;"
-                        "overflow:hidden;"
+                    with (
+                        ui.card()
+                        .classes("w-full p-0")
+                        .style(
+                            "border:1px solid var(--rb-line);border-radius:10px;overflow:hidden;"
+                        )
                     ):
                         with ui.tabs().classes("w-full") as variant_tabs:
                             ui.tab("conservative", label="Light touch", icon="tune")
@@ -392,12 +399,19 @@ def index_page() -> None:
                             "w-full p-0"
                         ):
                             _tab_cfg = [
-                                ("conservative", "Generate Light Touch", "tune",
-                                 _PLACEHOLDER_GENERATE),
-                                ("balanced", "Generate Standard Fit", "balance",
-                                 "Upload a resume, paste a JD, then start a tailored run."),
-                                ("bold", "Generate Bold Match", "bolt",
-                                 _PLACEHOLDER_GENERATE),
+                                (
+                                    "conservative",
+                                    "Generate Light Touch",
+                                    "tune",
+                                    _PLACEHOLDER_GENERATE,
+                                ),
+                                (
+                                    "balanced",
+                                    "Generate Standard Fit",
+                                    "balance",
+                                    "Upload a resume, paste a JD, then start a tailored run.",
+                                ),
+                                ("bold", "Generate Bold Match", "bolt", _PLACEHOLDER_GENERATE),
                             ]
                             _gen_rows: dict[str, Any] = {}
                             _gen_btns: dict[str, Any] = {}
@@ -414,9 +428,9 @@ def index_page() -> None:
                                                 with ui.row().classes(
                                                     "items-center justify-between w-full"
                                                 ):
-                                                    ui.label(
-                                                        _SECTION_LABELS[_sk]
-                                                    ).classes("rb-section-box-header")
+                                                    ui.label(_SECTION_LABELS[_sk]).classes(
+                                                        "rb-section-box-header"
+                                                    )
                                                     _copy_btn = ui.button(
                                                         icon="content_copy"
                                                     ).props("flat dense round")
@@ -426,9 +440,9 @@ def index_page() -> None:
                                                 ).classes("w-full")
                                     _gen_row = ui.row().classes("gap-2 items-center hidden")
                                     with _gen_row:
-                                        _gen_btn = ui.button(
-                                            _gen_label, icon=_gen_icon
-                                        ).props("unelevated")
+                                        _gen_btn = ui.button(_gen_label, icon=_gen_icon).props(
+                                            "unelevated"
+                                        )
                                         _gen_status = ui.label("").classes("rb-subtle")
                                     _gen_rows[_vname] = _gen_row
                                     _gen_btns[_vname] = _gen_btn
@@ -483,15 +497,14 @@ def index_page() -> None:
         async def _copy() -> None:
             text = (state["section_texts"].get(vname) or {}).get(sk) or ""
             try:
-                await ui.run_javascript(
-                    f"navigator.clipboard.writeText({json.dumps(text)})"
-                )
+                await ui.run_javascript(f"navigator.clipboard.writeText({json.dumps(text)})")
                 btn.props("icon=check")
                 await asyncio.sleep(1.5)
             except Exception:
                 pass
             finally:
                 btn.props("icon=content_copy")
+
         return _copy
 
     for _v, _sks in _variant_copy_btns.items():
@@ -620,9 +633,11 @@ def index_page() -> None:
         task = state.get("before_score_task")
         if task and not task.done():
             task.cancel()
+
         async def _delayed():
             await asyncio.sleep(1.5)
             await _compute_before_score()
+
         state["before_score_task"] = asyncio.create_task(_delayed())
 
     jd_input.on("update:model-value", lambda _: asyncio.create_task(schedule_before_score()))
@@ -720,9 +735,7 @@ def index_page() -> None:
 
         payments_enabled = state.get("payments_enabled", True)
         is_locked = (
-            payments_enabled
-            and bool(body.get("output_locked"))
-            and not body.get("final_output")
+            payments_enabled and bool(body.get("output_locked")) and not body.get("final_output")
         )
         if is_locked:
             export_row.classes(add="hidden")
@@ -1018,17 +1031,19 @@ def index_page() -> None:
         if task and not task.done():
             task.cancel()
         # Clear run state; keep resume_id so the same master resume stays selected
-        state.update({
-            "run_id": None,
-            "jd_text": None,
-            "payment_id": None,
-            "poll_payment": False,
-            "section_texts": {},
-            "current_run": None,
-            "cached_before_jd": None,
-            "cached_before_score": None,
-            "before_score_task": None,
-        })
+        state.update(
+            {
+                "run_id": None,
+                "jd_text": None,
+                "payment_id": None,
+                "poll_payment": False,
+                "section_texts": {},
+                "current_run": None,
+                "cached_before_jd": None,
+                "cached_before_score": None,
+                "before_score_task": None,
+            }
+        )
         await clear_browser_workflow()
         # Reset input fields
         jd_input.value = ""
@@ -1056,7 +1071,8 @@ def index_page() -> None:
         for _sk in SECTION_KEYS:
             _variant_sections["balanced"][_sk].set_content(
                 "Upload a resume, paste a JD, then start a tailored run."
-                if _sk == "summary" else ""
+                if _sk == "summary"
+                else ""
             )
             _variant_sections["conservative"][_sk].set_content(
                 _PLACEHOLDER_GENERATE if _sk == "summary" else ""

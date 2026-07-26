@@ -35,8 +35,7 @@ def fallback_jd_analysis(jd_text: str) -> JDAnalysis:
         )
         must_have.append(JDRequirement(requirement=term, category=category))
     nice_to_have = [
-        JDRequirement(requirement=term, category="skill")
-        for term in requirement_terms[5:12]
+        JDRequirement(requirement=term, category="skill") for term in requirement_terms[5:12]
     ]
     seniority: Literal["junior", "mid", "senior", "lead", "executive", "unknown"] = "unknown"
     lowered = jd_text.lower()

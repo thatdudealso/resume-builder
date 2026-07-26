@@ -47,12 +47,8 @@ async def engine():
             # (Alembic). Truncate all tables to get a clean slate without
             # touching constraint definitions (avoids CircularDependencyError
             # and named-constraint mismatches from use_alter).
-            table_names = ", ".join(
-                f'"{t.name}"' for t in Base.metadata.sorted_tables
-            )
-            await conn.execute(
-                text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
-            )
+            table_names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+            await conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
     yield engine
     await engine.dispose()
 

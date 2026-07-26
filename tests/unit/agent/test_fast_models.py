@@ -57,4 +57,3 @@ def test_grok_uses_latest():
     provider = GrokProvider()
     for task in AgentTask:
         assert provider.model_for_task(task) == GROK_MODEL
-

@@ -53,9 +53,10 @@ def _join(items: list[dict[str, object]], key: str = "requirement") -> str:
 
 
 def _evidence_summary(evidence: list[dict[str, object]]) -> str:
-    return "; ".join(
-        f"{e.get('requirement', '')}={e.get('status', 'missing')}" for e in evidence
-    ) or "none"
+    return (
+        "; ".join(f"{e.get('requirement', '')}={e.get('status', 'missing')}" for e in evidence)
+        or "none"
+    )
 
 
 def _components_summary(components: list[dict[str, object]]) -> str:

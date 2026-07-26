@@ -7,10 +7,11 @@
 
 ## 1. What This App Does
 
-Pay-per-run AI resume tailoring. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, picks a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok), then gets three tailored resume variations with JD-mirrored language, before/after job-fit scores, and LLM coaching bullets. No hallucinated facts.
+AI resume tailoring with optional pay-per-run access. A user uploads a master resume (PDF/DOCX/TXT), pastes a job description, picks a **tailoring style** (conservative/balanced/bold) and an **LLM provider** (OpenAI/Anthropic/Gemini/Grok), then gets three tailored resume variations with JD-mirrored language, before/after job-fit scores, and LLM coaching bullets. No hallucinated facts.
 
 **Free trial:** 1 resume upload + 1 JD run → full visible output.
-**All subsequent runs:** agent executes, output is **locked** (`output_locked = True`) until the user pays **$3.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
+**When payments are enabled:** subsequent runs execute with output **locked** (`output_locked = True`) until the user pays **$3.99** (Stripe one-time or crypto). Payment unlocks that specific run only.
+**When payments are disabled:** runs are free and unlimited, and the paywall controls are hidden.
 
 ---
 
@@ -73,7 +74,7 @@ resume-builder/
 │   │   │   └── fit_analyst.py       # assess_fit() — verdict + 4-6 coaching bullets
 │   │   ├── orchestrator/
 │   │   │   └── resume_orchestrator.py  # understand_resume_structure() for the understand_resume node
-│   │   ├── providers/               # LLM provider abstraction (5 providers)
+│   │   ├── providers/               # LLM provider abstraction (4 providers)
 │   │   │   ├── base.py              # AgentTask enum, LLMProvider ABC
 │   │   │   ├── registry.py          # get_provider(), list_provider_options()
 │   │   │   ├── anthropic_provider.py  # claude-opus-4-8 (all tasks)
@@ -137,7 +138,8 @@ resume-builder/
 │   └── versions/
 │       ├── 001_initial_schema.py    # All initial tables
 │       ├── 002_llm_provider.py      # Add llm_provider to agent_runs
-│       └── 003_resume_style_metadata.py  # Add style_metadata JSONB to master_resumes
+│       ├── 003_resume_style_metadata.py  # Add style_metadata JSONB to master_resumes
+│       └── 004_default_provider_openai.py # Set OpenAI as the default provider
 │
 ├── tests/
 │   ├── conftest.py                  # SQLite in-memory engine, session fixture
@@ -453,7 +455,7 @@ async with get_checkpointer(settings.database_url) as checkpointer:
 
 ### LLM Providers
 
-4 providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes.
+Four providers implement `LLMProvider` ABC. Provider is selected per-run and used for all nodes. OpenAI is the default.
 
 | Provider | Model used |
 |----------|-----------|
@@ -489,6 +491,8 @@ async with get_checkpointer(settings.database_url) as checkpointer:
 **HTTP tests:** `httpx.AsyncClient(transport=ASGITransport(app=app))`
 
 **All external services are mocked** — LLM providers, Stripe, NOWPayments, S3, boto3
+
+For local and dev environments, `apps/web/main.py` bootstraps the configured S3 bucket before serving requests. Production buckets are managed out of band.
 
 **Coverage gate:** 85% (`--cov-fail-under=85`) — run with:
 ```bash

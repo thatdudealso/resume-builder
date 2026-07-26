@@ -69,11 +69,7 @@ class AccessService:
         if user is None:
             raise ValueError("User not found")
         has_payment = await self.has_active_payment_window(user_id)
-        can_upload = (
-            not settings.payments_enabled
-            or not user.free_trial_used
-            or has_payment
-        )
+        can_upload = not settings.payments_enabled or not user.free_trial_used or has_payment
         return AccessSnapshot(
             user_id=user_id,
             free_trial_used=user.free_trial_used,
@@ -88,9 +84,7 @@ class AccessService:
             return True
 
         result = await self.session.execute(
-            select(func.count())
-            .select_from(MasterResume)
-            .where(MasterResume.user_id == user_id)
+            select(func.count()).select_from(MasterResume).where(MasterResume.user_id == user_id)
         )
         count = result.scalar() or 0
         return count < 1

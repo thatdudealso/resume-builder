@@ -15,8 +15,10 @@ def _client_error(status: int) -> ClientError:
 async def test_creates_bucket_when_missing():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(404)
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
@@ -26,8 +28,10 @@ async def test_creates_bucket_when_missing():
 
 async def test_skips_when_no_endpoint():
     client = MagicMock()
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "local"
         s.s3_endpoint = None
         await ensure_bucket_exists()
@@ -37,8 +41,10 @@ async def test_skips_when_no_endpoint():
 async def test_does_not_create_on_access_denied():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(403)
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
@@ -49,8 +55,10 @@ async def test_does_not_create_on_access_denied():
 async def test_connection_failure_does_not_create_or_raise():
     client = MagicMock()
     client.head_bucket.side_effect = OSError("connection refused")
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
@@ -64,8 +72,10 @@ async def test_create_failure_does_not_abort_startup():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(404)
     client.create_bucket.side_effect = OSError("endpoint down")
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
@@ -78,9 +88,11 @@ async def test_create_failure_does_not_abort_startup():
 async def test_retries_until_s3_is_ready():
     client = MagicMock()
     client.head_bucket.side_effect = [OSError("starting"), None]
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s, \
-         patch("apps.web.services.s3_bootstrap.asyncio.sleep") as sleep:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+        patch("apps.web.services.s3_bootstrap.asyncio.sleep") as sleep,
+    ):
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
@@ -91,8 +103,10 @@ async def test_retries_until_s3_is_ready():
 
 async def test_skips_bootstrap_outside_local_and_dev():
     client = MagicMock()
-    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
-         patch("apps.web.services.s3_bootstrap.settings") as s:
+    with (
+        patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client),
+        patch("apps.web.services.s3_bootstrap.settings") as s,
+    ):
         s.env = "qa"
         s.s3_endpoint = "http://minio:9000"
         await ensure_bucket_exists()
