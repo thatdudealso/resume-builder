@@ -69,12 +69,10 @@ async def analyze_jd(jd_text: str, provider: LLMProvider) -> JDAnalysis:
         try:
             raw = await provider.complete(AgentTask.JD_ANALYSIS, prompt, json_mode=True)
             return JDAnalysis.model_validate(parse_json_response(raw))
-        except Exception:
-            snippet = (raw or "")[:500]
+        except Exception as exc:
             logger.warning(
                 "analyze_jd: LLM response rejected, falling back to keyword extraction. "
-                "raw_snippet=%r",
-                snippet,
-                exc_info=True,
+                "error_type=%s",
+                type(exc).__name__,
             )
     return fallback_jd_analysis(jd_text)

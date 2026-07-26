@@ -105,12 +105,10 @@ async def analyze_resume(
         try:
             raw = await provider.complete(AgentTask.RESUME_ANALYSIS, prompt, json_mode=True)
             return ResumeAnalysis.model_validate(parse_json_response(raw))
-        except Exception:
-            snippet = (raw or "")[:500]
+        except Exception as exc:
             logger.warning(
                 "analyze_resume: LLM response rejected, falling back to heuristic analysis. "
-                "raw_snippet=%r",
-                snippet,
-                exc_info=True,
+                "error_type=%s",
+                type(exc).__name__,
             )
     return fallback_resume_analysis(resume_text, jd_analysis)

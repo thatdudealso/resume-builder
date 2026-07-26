@@ -128,7 +128,10 @@ async def assess_fit(
             raw = await provider.complete(AgentTask.FIT_ASSESSMENT, prompt, json_mode=True)
             data = parse_json_response(raw)
             return FitAssessment.model_validate(data)
-        except Exception:
-            logger.warning("assess_fit LLM call failed, using heuristic fallback", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "assess_fit LLM call failed, using heuristic fallback. error_type=%s",
+                type(exc).__name__,
+            )
 
     return _fallback(score_after, evidence, dealbreakers)

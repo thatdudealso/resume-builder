@@ -54,13 +54,11 @@ async def analyze_inputs_combined(
             jd_analysis = JDAnalysis.model_validate(data["jd_analysis"])
             resume_analysis = ResumeAnalysis.model_validate(data["resume_analysis"])
             return jd_analysis, resume_analysis
-        except Exception:
-            snippet = (raw or "")[:500]
+        except Exception as exc:
             logger.warning(
                 "analyze_inputs_combined: LLM response rejected, falling back to keyword "
-                "extraction. raw_snippet=%r",
-                snippet,
-                exc_info=True,
+                "extraction. error_type=%s",
+                type(exc).__name__,
             )
     jd_analysis = fallback_jd_analysis(jd_text)
     resume_analysis = fallback_resume_analysis(resume_text, jd_analysis)
