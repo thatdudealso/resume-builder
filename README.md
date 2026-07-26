@@ -2,7 +2,7 @@
 
 **Tailor your resume without inventing facts.**
 
-Upload a master resume, paste a job description, and get three tailored variations - Light Touch, Standard Fit, Bold Match - each scored against the job so you know how well it actually fits. Edit any section inline, then export to PDF, DOCX, or TXT.
+Upload a master resume, paste a job description, and get three tailored variations - Light Touch, Standard Fit, Bold Match - each scored against the job so you know how well it actually fits. Review the results, then export to PDF, DOCX, or TXT.
 
 ![ResumeBild UI - upload, tailor, and review variants with a job-fit score](docs/assets/resumebild-ui.png)
 
@@ -18,7 +18,7 @@ Most "AI resume tailoring" tools rewrite freely and let the model pad in skills 
 
 1. **Upload** your master resume (PDF, DOCX, or TXT).
 2. **Paste** the job description you're applying to.
-3. **Review and export** - compare the three variants and their job-fit scores, edit any section inline, then download the one you want.
+3. **Review and export** - compare the three variants and their job-fit scores, then download the one you want.
 
 ---
 
