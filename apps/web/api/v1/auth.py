@@ -22,7 +22,6 @@ from packages.core.security.jwt import (
     rotate_refresh_token,
 )
 from packages.db.models.device_session import DeviceSession
-from packages.db.models.resume import MasterResume
 from packages.db.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -160,12 +159,8 @@ async def me(user: User = Depends(get_current_user), session: AsyncSession = Dep
     from packages.core.access.service import AccessService
 
     snap = await AccessService(session).get_snapshot(user.id)
-    resume_count = await session.execute(
-        select(func.count()).select_from(MasterResume).where(MasterResume.user_id == user.id)
-    )
-    can_upload = (resume_count.scalar() or 0) < 1 or snap.has_confirmed_payment
     return {
         "user": {"id": str(user.id), "email": user.email},
         "free_trial_used": snap.free_trial_used,
-        "can_upload": can_upload,
+        "can_upload": snap.can_upload,
     }

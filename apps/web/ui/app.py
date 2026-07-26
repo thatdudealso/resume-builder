@@ -98,21 +98,12 @@ def _should_show_support_link(payments_enabled: bool, support_url: str) -> bool:
     return (not payments_enabled) and bool(support_url.strip())
 
 
-_RUN_ERROR_GENERIC = (
-    "The AI provider could not complete this run. Try again or pick another model."
-)
+_RUN_ERROR_GENERIC = "We couldn't complete that request. Please try again."
 
 
 def _sanitize_run_error(message: str) -> str:
-    """Pure helper: turn a raw run-error message into a clean, human string.
-
-    Never surfaces raw provider/stack text - long messages or anything that looks
-    like a traceback is replaced with a generic, friendly message.
-    """
-    clean = (message or "").strip() or "Something went wrong generating your resume."
-    if len(clean) > 160 or "Traceback" in clean:
-        return _RUN_ERROR_GENERIC
-    return clean
+    """Pure helper: turn a raw run-error message into a clean, human string."""
+    return _RUN_ERROR_GENERIC
 
 
 def _install_page_shell() -> None:

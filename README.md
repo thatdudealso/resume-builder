@@ -385,7 +385,7 @@ resume-builder/
 │   ├── core/                 # Auth, access/paywall, security
 │   ├── db/                   # SQLAlchemy models + session
 │   ├── export/               # PDF/DOCX generation
-│   └── integrations/         # Stripe, S3, Hugging Face, crypto
+│   └── integrations/         # Stripe, S3, crypto
 ├── migrations/versions/      # Alembic migrations
 ├── scripts/                  # migrate, deploy, db doc tools
 ├── tests/                    # unit + integration tests
@@ -460,4 +460,3 @@ This removes Postgres and MinIO volumes and reapplies migrations from scratch.
 - **Data:** PostgreSQL 16, Redis 7, S3 (MinIO locally)
 - **Payments:** Stripe Checkout + NOWPayments (crypto)
 - **Export:** WeasyPrint (PDF), python-docx (DOCX)
-

@@ -187,7 +187,7 @@ resume-builder/
 ## 3. Naming Conventions
 
 ### Files & modules
-- All files: `snake_case.py` — `run_executor.py`, `hf_inference.py`, `device_session.py`
+- All files: `snake_case.py` — `run_executor.py`, `device_session.py`
 - No abbreviations in file names: `access_service.py` not `acc_svc.py`
 
 ### Python identifiers
@@ -499,7 +499,6 @@ pytest --cov=packages --cov=apps --cov-fail-under=85
 - `apps/web/ui/*` — NiceGUI pages
 - `apps/web/api/v1/webhooks/*`
 - `packages/export/pdf_export.py`
-- `packages/integrations/hf_inference.py`
 - `packages/integrations/crypto/nowpayments.py`
 
 **Test layout mirrors source:**

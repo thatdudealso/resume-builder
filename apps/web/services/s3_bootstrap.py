@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_bucket_exists() -> None:
-    if not settings.s3_endpoint:
+    if settings.env not in ("local", "dev") or not settings.s3_endpoint:
         # AWS/prod manages buckets out of band.
         return
     client = get_s3_client()

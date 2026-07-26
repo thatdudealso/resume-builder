@@ -38,6 +38,18 @@ async def test_can_upload_true_when_payments_disabled(session):
 
 
 @pytest.mark.asyncio
+async def test_snapshot_can_upload_true_when_payments_disabled(session):
+    user = await register_user(session, "payments-disabled-snapshot@example.com", "password123")
+    user.free_trial_used = True
+    await session.flush()
+
+    access = AccessService(session)
+    with patch("packages.core.access.service.settings") as mock_settings:
+        mock_settings.payments_enabled = False
+        assert (await access.get_snapshot(user.id)).can_upload is True
+
+
+@pytest.mark.asyncio
 async def test_can_view_output_true_when_payments_disabled(session):
     user = await register_user(session, "payments-disabled-view@example.com", "password123")
     user.free_trial_used = True

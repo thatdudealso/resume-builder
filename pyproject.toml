@@ -65,7 +65,6 @@ omit = [
     "apps/web/ui/*",
     "apps/web/api/v1/webhooks/*",
     "packages/export/pdf_export.py",
-    "packages/integrations/hf_inference.py",
     "packages/integrations/crypto/nowpayments.py",
 ]
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 from apps.web.ui.app import _RUN_ERROR_GENERIC, _sanitize_run_error
 
 
-def test_sanitize_run_error_passes_through_normal_short_message():
+def test_sanitize_run_error_hides_short_provider_message():
     message = "Provider timed out after 3 retries"
-    assert _sanitize_run_error(message) == message
+    assert _sanitize_run_error(message) == _RUN_ERROR_GENERIC
 
 
 def test_sanitize_run_error_replaces_traceback_text():
@@ -13,19 +13,19 @@ def test_sanitize_run_error_replaces_traceback_text():
     assert _sanitize_run_error(message) == _RUN_ERROR_GENERIC
 
 
-def test_sanitize_run_error_replaces_long_message():
+def test_sanitize_run_error_hides_long_message():
     message = "x" * 161
     assert _sanitize_run_error(message) == _RUN_ERROR_GENERIC
 
 
-def test_sanitize_run_error_allows_message_at_boundary_length():
+def test_sanitize_run_error_hides_message_at_boundary_length():
     message = "x" * 160
-    assert _sanitize_run_error(message) == message
+    assert _sanitize_run_error(message) == _RUN_ERROR_GENERIC
 
 
 def test_sanitize_run_error_handles_empty_message():
-    assert _sanitize_run_error("") == "Something went wrong generating your resume."
+    assert _sanitize_run_error("") == _RUN_ERROR_GENERIC
 
 
 def test_sanitize_run_error_handles_whitespace_only_message():
-    assert _sanitize_run_error("   ") == "Something went wrong generating your resume."
+    assert _sanitize_run_error("   ") == _RUN_ERROR_GENERIC
