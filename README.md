@@ -2,7 +2,7 @@
 
 AI-powered resume tailoring: upload a master resume, paste a job description, and get an ATS-optimized rewrite that stays grounded in your real experience (no invented facts).
 
-The app runs as a single FastAPI service with a NiceGUI frontend, LangGraph agents, PostgreSQL, Redis, and S3-compatible storage. Runs after the free trial are paywalled ($3.99 unlock via Stripe or crypto).
+The app runs as a single FastAPI service with a NiceGUI frontend, LangGraph agents, PostgreSQL, Redis, and S3-compatible storage. Payments are optional: when enabled, runs after the free trial are paywalled ($3.99 unlock via Stripe or crypto); when disabled, the workspace is free and unlimited.
 
 ---
 
@@ -11,7 +11,7 @@ The app runs as a single FastAPI service with a NiceGUI frontend, LangGraph agen
 - [Prerequisites](#prerequisites)
 - [Quick start (Docker — recommended)](#quick-start-docker--recommended)
 - [Configure environment variables](#configure-environment-variables)
-- [Create the MinIO bucket](#create-the-minio-bucket)
+- [MinIO bucket bootstrap](#4-minio-bucket-bootstrap)
 - [Use the app](#use-the-app)
 - [LLM providers](#llm-providers)
 - [Payment setup (optional)](#payment-setup-optional)
@@ -74,28 +74,15 @@ This starts:
 
 Migrations run automatically via the `migrate` service before `web` starts. Migrations are **never** auto-run inside the web process itself.
 
-### 4. Create the MinIO bucket
+### 4. MinIO bucket bootstrap
 
-Resume uploads and exports require an S3 bucket. MinIO does not create it automatically.
-
-**Option A — MinIO Console (easiest)**
-
-1. Open http://localhost:9001
-2. Login: `minioadmin` / `minioadmin`
-3. Create a bucket named `resume-builder` (must match `S3_BUCKET` in `.env`)
-
-**Option B — MinIO client**
-
-```bash
-docker compose exec minio mc alias set local http://localhost:9000 minioadmin minioadmin
-docker compose exec minio mc mb local/resume-builder --ignore-existing
-```
+For local and dev environments, the web service creates `S3_BUCKET` on startup if it is missing. No manual bucket setup is required. AWS and other production S3 buckets remain managed out of band.
 
 ### 5. Open the app
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:8000/app | Main workflow (upload → tailor → paywall → export) |
+| http://localhost:8000/app | Main workflow (upload → tailor → optional paywall → export) |
 | http://localhost:8000/app/dashboard | Advanced dashboard (provider picker, variants, section editor) |
 | http://localhost:8000/api/v1 | REST API (OpenAPI at `/docs`) |
 | http://localhost:8000/health | Health check (`db` + `redis` status) |
@@ -119,9 +106,8 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `S3_BUCKET` | Yes | Bucket name, default `resume-builder` |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Yes | MinIO: `minioadmin` / `minioadmin` |
 | `S3_REGION` | No | Default `us-east-1` |
-| `HF_TOKEN` | Recommended | Hugging Face Inference API token (default provider) |
+| `OPENAI_API_KEY` | Recommended | OpenAI (default provider; `OPENAI_BASE_URL` defaults to OpenAI API) |
 | `ANTHROPIC_API_KEY` | Optional | Anthropic Claude |
-| `OPENAI_API_KEY` | Optional | OpenAI (`OPENAI_BASE_URL` defaults to OpenAI API) |
 | `GEMINI_API_KEY` | Optional | Google Gemini |
 | `XAI_API_KEY` | Optional | xAI Grok (`XAI_BASE_URL` configurable) |
 | `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
@@ -130,17 +116,13 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `STRIPE_PRICE_ID` | Unused | Legacy; checkout uses `RUN_UNLOCK_PRICE_USD` |
 | `NOWPAYMENTS_API_KEY` | Optional | Crypto payments via NOWPayments |
 | `NOWPAYMENTS_IPN_SECRET` | Optional | NOWPayments IPN HMAC secret |
+| `PAYMENTS_ENABLED` | No | `true`/`false` to force payments on/off. Empty (default) auto-derives: on when Stripe or NOWPayments keys are set, otherwise off |
+| `SUPPORT_URL` | No | When payments are off, shows a single subtle support link pointing here |
 | `RUN_UNLOCK_PRICE_USD` | No | Display/checkout amount. Default: `3.99` |
 
 Never commit `.env` or real API keys to git.
 
 ---
-
-## Create the MinIO bucket
-
-If you skipped this during quick start: uploads fail until the bucket exists. Bucket name must match `S3_BUCKET` (default `resume-builder`).
-
-See [step 4 in Quick start](#4-create-the-minio-bucket) for console or CLI instructions.
 
 ---
 
@@ -150,11 +132,10 @@ See [step 4 in Quick start](#4-create-the-minio-bucket) for console or CLI instr
 
 1. Upload a PDF or DOCX master resume.
 2. Paste a job description.
-3. Start a run — progress updates stream live in the UI.
-4. **First run is free** (full output unlocked).
-5. **Second run onward** shows a locked preview until payment.
-6. Pay via Stripe or crypto, then poll until the webhook unlocks the run.
-7. Export to PDF or DOCX when output is unlocked.
+3. Start a run - progress updates stream live in the UI.
+4. If payments are enabled, the first run is free and later runs show a locked preview until payment. If payments are disabled, runs remain free and unlimited.
+5. When payments are enabled, pay via Stripe or crypto, then poll until the webhook unlocks the run.
+6. Export to PDF or DOCX when output is unlocked.
 
 ### Advanced dashboard (`/app/dashboard`)
 
@@ -183,27 +164,26 @@ Interactive API docs: http://localhost:8000/docs
 
 ## LLM providers
 
-Supported providers (selectable on `/app` and the dashboard; default is Hugging Face):
+Supported providers (selectable on `/app` and the dashboard; default is OpenAI):
 
 | Provider | Env var | Notes |
 |----------|---------|-------|
-| Hugging Face | `HF_TOKEN` | Default; uses Inference API models |
-| OpenAI | `OPENAI_API_KEY` | GPT-4o family |
+| OpenAI | `OPENAI_API_KEY` | Default; GPT-4o family |
 | Anthropic | `ANTHROPIC_API_KEY` | Claude |
 | Google Gemini | `GEMINI_API_KEY` | |
 | xAI Grok | `XAI_API_KEY` | |
 
 If a provider’s API key is missing, the agent uses deterministic mock completions so the app still runs locally — useful for UI testing, not for real tailoring.
 
-**Minimum for real runs:** set `HF_TOKEN` (or configure another provider and choose it on the dashboard).
+**Minimum for real runs:** set `OPENAI_API_KEY` (or configure another provider and choose it on the dashboard).
 
-Get a Hugging Face token: https://huggingface.co/settings/tokens
+Get an OpenAI API key: https://platform.openai.com/api-keys
 
 ---
 
 ## Payment setup (optional)
 
-Payments are only needed to test the paywall after the free trial.
+Payments are only needed to test the paywall after the free trial. Leave payment keys empty, or set `PAYMENTS_ENABLED=false`, for a free and unlimited local workspace.
 
 ### Stripe (recommended for local testing)
 
@@ -263,7 +243,7 @@ REDIS_URL=redis://localhost:6379/0
 S3_ENDPOINT=http://localhost:9000
 ```
 
-Create the MinIO bucket at http://localhost:9001 (see above).
+The local/dev web service creates the configured MinIO bucket automatically at startup.
 
 ### 4. Run migrations
 
@@ -357,7 +337,7 @@ ENV=test \
   DATABASE_URL=postgresql+asyncpg://resume:resume@localhost:5432/resume_builder_test \
   REDIS_URL=redis://localhost:6379/1 \
   JWT_SECRET=test-secret-key-minimum-32-characters-long \
-  HF_TOKEN=test ANTHROPIC_API_KEY=test OPENAI_API_KEY= \
+  OPENAI_API_KEY=test ANTHROPIC_API_KEY=test \
   STRIPE_SECRET_KEY=sk_test_fake STRIPE_WEBHOOK_SECRET=whsec_test \
   NOWPAYMENTS_API_KEY=test NOWPAYMENTS_IPN_SECRET=test \
   PYTHONPATH=. \
@@ -385,7 +365,7 @@ resume-builder/
 │   ├── core/                 # Auth, access/paywall, security
 │   ├── db/                   # SQLAlchemy models + session
 │   ├── export/               # PDF/DOCX generation
-│   └── integrations/         # Stripe, S3, Hugging Face, crypto
+│   └── integrations/         # Stripe, S3, crypto
 ├── migrations/versions/      # Alembic migrations
 ├── scripts/                  # migrate, deploy, db doc tools
 ├── tests/                    # unit + integration tests
@@ -422,13 +402,13 @@ Engineering plans and status (private dev docs) live on `develop` under `docs/de
 
 ### Resume upload fails (S3 / MinIO error)
 
-- Confirm the bucket exists and matches `S3_BUCKET` in `.env`
+- In local/dev, confirm the web startup log shows the configured bucket was created or already exists; in production, confirm the bucket exists and matches `S3_BUCKET` in `.env`.
 - Verify MinIO is running: http://localhost:9001
 - Check credentials: `S3_ACCESS_KEY` / `S3_SECRET_KEY`
 
 ### Agent runs complete but output looks like placeholder text
 
-- No LLM API key is configured. Add `HF_TOKEN` or another provider key and restart.
+- No LLM API key is configured. Add `OPENAI_API_KEY` or another provider key and restart.
 - On the dashboard, confirm the selected provider is configured.
 
 ### Paywall does not unlock after Stripe payment
@@ -460,4 +440,3 @@ This removes Postgres and MinIO volumes and reapplies migrations from scratch.
 - **Data:** PostgreSQL 16, Redis 7, S3 (MinIO locally)
 - **Payments:** Stripe Checkout + NOWPayments (crypto)
 - **Export:** WeasyPrint (PDF), python-docx (DOCX)
-

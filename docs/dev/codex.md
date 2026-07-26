@@ -40,8 +40,9 @@ Dev-only file. **Never merge to `main`.**
   `X-Device-Fingerprint` on API calls.
 - Use backend access flags as the source of truth. Do not reveal `final_output`
   when `output_locked=true`.
-- Show locked previews with the paywall, then poll run status after payment return
-  until the webhook unlocks the run.
+- When payments are enabled, show locked previews with the paywall, then poll run
+  status after payment return until the webhook unlocks the run. When disabled,
+  keep output unlocked and hide payment controls.
 - Show export actions only after the run output is viewable; let backend export
   permissions decide allowed formats.
 
@@ -52,7 +53,7 @@ Dev-only file. **Never merge to `main`.**
 - `/api/v1/auth/me` returns free-trial and upload state for the current device workspace.
 - `/api/v1/resumes` uploads and lists resumes scoped to the current user.
 - `/api/v1/runs` creates runs; `/api/v1/runs/{run_id}/stream` emits SSE progress.
-- `/api/v1/billing/stripe/checkout` and `/api/v1/billing/crypto/invoice` create payments.
+- `/api/v1/billing/stripe/checkout` and `/api/v1/billing/crypto/invoice` create payments when payments are enabled; disabled mode returns a clear service-unavailable response.
 - `/api/v1/exports` creates downloads only when `AccessService.can_view_output()` passes.
 
 ## Commands

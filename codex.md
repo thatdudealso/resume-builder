@@ -41,7 +41,7 @@ Use it before changing code, opening PRs, or updating generated documentation.
 
 - Protected APIs create or reuse the private device workspace from
   `X-Device-Fingerprint` when no token is present.
-- Resume upload is `/api/v1/resumes`; only the first upload is free without confirmed payment.
+- Resume upload is `/api/v1/resumes`; access is free and unlimited when payments are disabled, otherwise the free-trial rules apply.
 - Run creation is `/api/v1/runs`; progress streams from `/api/v1/runs/{run_id}/stream`.
 - Locked output is revealed only after `AccessService.unlock_run()` changes the run state.
 - Exports go through `/api/v1/exports` and must respect backend access checks.

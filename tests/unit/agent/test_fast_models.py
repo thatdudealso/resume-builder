@@ -4,7 +4,6 @@ from packages.agent.providers.anthropic_provider import ANTHROPIC_OPUS_MODEL, An
 from packages.agent.providers.base import AgentTask
 from packages.agent.providers.gemini_provider import GEMINI_FLASH_MODEL, GeminiProvider
 from packages.agent.providers.grok_provider import GROK_MODEL, GrokProvider
-from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
 
 
@@ -32,7 +31,6 @@ def test_all_providers_cover_all_tasks():
         OpenAIProvider,
         GeminiProvider,
         GrokProvider,
-        HuggingFaceProvider,
     ]
     for cls in providers:
         _all_tasks_have_models(cls)
@@ -59,9 +57,3 @@ def test_grok_uses_latest():
     provider = GrokProvider()
     for task in AgentTask:
         assert provider.model_for_task(task) == GROK_MODEL
-
-
-def test_huggingface_uses_latest_llama():
-    provider = HuggingFaceProvider()
-    for task in AgentTask:
-        assert provider.model_for_task(task) == "meta-llama/Llama-3.3-70B-Instruct"

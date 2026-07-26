@@ -25,7 +25,7 @@ async def watch_run_progress(
     queue = get_run_queue(run_id)
     progress_value = 0.1
     logger.info("watch_run_progress subscribed run_id=%s", run_id)
-    on_update("Run started — preparing inputs", progress_value)
+    on_update("Run started - preparing inputs", progress_value)
 
     while True:
         try:

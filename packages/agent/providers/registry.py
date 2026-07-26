@@ -4,7 +4,6 @@ from packages.agent.providers.anthropic_provider import AnthropicProvider
 from packages.agent.providers.base import LLMProvider
 from packages.agent.providers.gemini_provider import GeminiProvider
 from packages.agent.providers.grok_provider import GrokProvider
-from packages.agent.providers.huggingface_provider import HuggingFaceProvider
 from packages.agent.providers.openai_provider import OpenAIProvider
 from packages.agent.schemas.providers import DEFAULT_PROVIDER, PROVIDER_LABELS, LLMProviderName
 
@@ -13,7 +12,6 @@ _PROVIDER_FACTORIES: dict[LLMProviderName, type[LLMProvider]] = {
     LLMProviderName.ANTHROPIC: AnthropicProvider,
     LLMProviderName.GEMINI: GeminiProvider,
     LLMProviderName.GROK: GrokProvider,
-    LLMProviderName.HUGGINGFACE: HuggingFaceProvider,
 }
 
 
@@ -43,4 +41,7 @@ def list_provider_options() -> list[dict[str, object]]:
 def resolve_provider_name(name: str | None) -> LLMProviderName:
     if not name:
         return DEFAULT_PROVIDER
-    return LLMProviderName(name)
+    try:
+        return LLMProviderName(name)
+    except ValueError:
+        return DEFAULT_PROVIDER

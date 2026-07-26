@@ -184,7 +184,31 @@ def structured_sections_missing(structured: dict[str, str]) -> list[str]:
 def extract_keywords(jd_text: str) -> list[str]:
     words = re.findall(r"[A-Za-z][A-Za-z0-9+#./-]{1,}", jd_text.lower())
     stop = {
-        "and", "the", "with", "for", "you", "will", "our", "are", "this", "that", "from", "have"
+        "and",
+        "the",
+        "with",
+        "for",
+        "you",
+        "will",
+        "our",
+        "are",
+        "this",
+        "that",
+        "from",
+        "have",
+        "between",
+        "against",
+        "within",
+        "across",
+        "customer",
+        "technical",
+        "using",
+        "their",
+        "there",
+        "would",
+        "could",
+        "should",
+        "about",
     }
     freq: dict[str, int] = {}
     for w in words:

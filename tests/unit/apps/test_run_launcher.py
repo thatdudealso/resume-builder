@@ -36,12 +36,12 @@ async def test_create_run_record_persists(session):
         user,
         resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         variant="balanced",
     )
 
     assert result["run_id"]
-    assert result["llm_provider"] == "huggingface"
+    assert result["llm_provider"] == "openai"
 
 
 @pytest.mark.asyncio
@@ -71,7 +71,7 @@ async def test_create_and_schedule_run_schedules_background(session, monkeypatch
         user,
         resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         variant="balanced",
     )
 
@@ -107,7 +107,7 @@ async def test_create_run_record_uses_active_payment_window(session):
         user,
         resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         variant="balanced",
     )
 
@@ -156,7 +156,7 @@ async def test_create_run_record_fails_closed_when_paid_without_active_payment(
         user,
         resume_id=resume.id,
         jd_text="Python developer required " * 5,
-        llm_provider="huggingface",
+        llm_provider="openai",
         variant="balanced",
     )
 
@@ -178,7 +178,7 @@ async def test_create_run_record_rejects_missing_resume(session):
             user,
             resume_id=user.id,
             jd_text="Python developer required " * 5,
-            llm_provider="huggingface",
+            llm_provider="openai",
             variant="balanced",
         )
 

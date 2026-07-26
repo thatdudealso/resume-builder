@@ -53,9 +53,10 @@ def _join(items: list[dict[str, object]], key: str = "requirement") -> str:
 
 
 def _evidence_summary(evidence: list[dict[str, object]]) -> str:
-    return "; ".join(
-        f"{e.get('requirement', '')}={e.get('status', 'missing')}" for e in evidence
-    ) or "none"
+    return (
+        "; ".join(f"{e.get('requirement', '')}={e.get('status', 'missing')}" for e in evidence)
+        or "none"
+    )
 
 
 def _components_summary(components: list[dict[str, object]]) -> str:
@@ -128,7 +129,10 @@ async def assess_fit(
             raw = await provider.complete(AgentTask.FIT_ASSESSMENT, prompt, json_mode=True)
             data = parse_json_response(raw)
             return FitAssessment.model_validate(data)
-        except Exception:
-            logger.warning("assess_fit LLM call failed, using heuristic fallback", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "assess_fit LLM call failed, using heuristic fallback. error_type=%s",
+                type(exc).__name__,
+            )
 
     return _fallback(score_after, evidence, dealbreakers)

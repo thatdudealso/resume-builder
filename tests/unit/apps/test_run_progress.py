@@ -29,6 +29,6 @@ async def test_watch_run_progress_receives_queue_events():
     await producer_task
 
     assert result == "done"
-    assert updates[0][0] == "Run started — preparing inputs"
+    assert updates[0][0] == "Run started - preparing inputs"
     assert any("Reading resume" in label for label, _ in updates)
     assert updates[-1] == ("Run complete", 1.0)

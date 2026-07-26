@@ -65,7 +65,6 @@ omit = [
     "apps/web/ui/*",
     "apps/web/api/v1/webhooks/*",
     "packages/export/pdf_export.py",
-    "packages/integrations/hf_inference.py",
     "packages/integrations/crypto/nowpayments.py",
 ]
 
@@ -121,7 +120,6 @@ module = [
     "packages.integrations.crypto.*",
     "packages.integrations.stripe_client",
     "packages.integrations.s3_storage",
-    "packages.integrations.hf_inference",
     "packages.export.pdf_export",
     "packages.core.security.jwt",
     "packages.agent.graph",
@@ -140,6 +138,8 @@ module = [
     "apps.web.api.v1.webhooks.crypto",
     "apps.web.middleware.rate_limit",
     "apps.web.middleware.security_headers",
+    "apps.web.middleware.device_fingerprint",
+    "apps.web.services.s3_bootstrap",
     "apps.web.ui.app",
     "apps.web.ui.auth_guard",
     "apps.web.main",

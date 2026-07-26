@@ -16,16 +16,10 @@ os.environ.setdefault("JWT_SECRET", "test-secret-key-minimum-32-characters-long"
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("NOWPAYMENTS_API_KEY", "test")
+os.environ.setdefault("OPENAI_API_KEY", "test")
 
 import packages.db.models  # noqa: F401
-import packages.integrations.hf_inference as hf_inference
 from packages.db.base import Base
-
-
-@pytest.fixture(autouse=True)
-def reset_hf_circuit_breaker() -> None:
-    hf_inference._circuit_open_until = 0.0
-    hf_inference._failure_count = 0
 
 
 @pytest.fixture(scope="session")
@@ -53,12 +47,8 @@ async def engine():
             # (Alembic). Truncate all tables to get a clean slate without
             # touching constraint definitions (avoids CircularDependencyError
             # and named-constraint mismatches from use_alter).
-            table_names = ", ".join(
-                f'"{t.name}"' for t in Base.metadata.sorted_tables
-            )
-            await conn.execute(
-                text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
-            )
+            table_names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+            await conn.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
     yield engine
     await engine.dispose()
 

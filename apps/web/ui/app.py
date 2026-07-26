@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
 from typing import Any
 from uuid import UUID
 
@@ -27,6 +26,7 @@ from apps.web.ui.workflow_session import (
     merge_query_workflow_state,
     save_browser_workflow,
 )
+from packages.agent.schemas.providers import DEFAULT_PROVIDER
 from packages.agent.schemas.variants import DEFAULT_VARIANT, SECTION_KEYS
 
 STEPS = {
@@ -48,16 +48,7 @@ _SECTION_LABELS: dict[str, str] = {
 
 _PLACEHOLDER_GENERATE = "_Generate this variant after the main run completes._"
 _PLACEHOLDER_LOADING = "Starting the tailoring workflow..."
-
-_RESUME_QUOTES = [
-    "_Your future boss is already impressed — they just haven't read this yet._ 🌟",
-    "_Plot twist: you were qualified the whole time._ 🎭",
-    "_Somewhere, a hiring manager is about to have a really good day._ ☀️",
-    "_Turning your career into a highlight reel, one bullet at a time._ 🎬",
-    "_Even SpongeBob had a resume. Yours is going to be so much better._ 🧽",
-    "_Good things take time. Great tailored resumes take slightly less time._ ⏳",
-    "_Your experience section is about to get a glow-up._ ✨",
-]
+_EMPTY_SECTION = ""
 
 _VERDICT_COLOR = {
     "Strong fit": "#2f6f5f",
@@ -90,8 +81,29 @@ def _format_detail(response_text: str, fallback: str) -> str:
 
 def _score_label(score: float | None) -> str:
     if score is None:
-        return "—"
+        return "-"
     return f"{score:.0f}/100"
+
+
+def _billing_shows_payments(billing: dict[str, Any]) -> bool:
+    """Pure gating decision: should the UI show payment controls for this billing status?"""
+    return bool(billing.get("payments_enabled", True))
+
+
+def _should_show_support_link(payments_enabled: bool, support_url: str) -> bool:
+    """Pure gating decision: should the soft-upsell support link be shown?
+
+    Shows only when payments are disabled AND a non-empty support URL is provided.
+    """
+    return (not payments_enabled) and bool(support_url.strip())
+
+
+_RUN_ERROR_GENERIC = "We couldn't complete that request. Please try again."
+
+
+def _sanitize_run_error(message: str) -> str:
+    """Pure helper: turn a raw run-error message into a clean, human string."""
+    return _RUN_ERROR_GENERIC
 
 
 def _install_page_shell() -> None:
@@ -208,6 +220,30 @@ def _install_page_shell() -> None:
           .q-field__control, .q-textarea .q-field__control { border-radius: 8px; }
           .q-btn.bg-primary { background: var(--rb-accent) !important; }
           .text-primary { color: var(--rb-accent) !important; }
+          .q-field__control { background: var(--rb-panel); }
+          .rb-panel .q-field__control:before { border-color: var(--rb-line); }
+          .q-uploader {
+            box-shadow: none;
+            border: 1px dashed var(--rb-line);
+            border-radius: 8px;
+            background: var(--rb-panel);
+          }
+          .q-uploader__header {
+            background: var(--rb-panel);
+            color: var(--rb-ink);
+            box-shadow: none;
+            border-bottom: 1px solid var(--rb-line);
+          }
+          .q-uploader__title { font-size: 13px; }
+          .q-uploader__subtitle { color: var(--rb-muted); }
+          .q-uploader__list { background: var(--rb-panel); }
+          .q-uploader .q-btn.bg-primary {
+            background: transparent !important;
+            color: var(--rb-muted) !important;
+          }
+          .q-uploader .q-uploader__header .q-btn { color: var(--rb-muted) !important; }
+          .q-uploader .q-uploader__file--uploaded .q-icon { color: var(--rb-accent); }
+          .q-linear-progress { color: var(--rb-accent); }
           @media (max-width: 900px) {
             .rb-page { padding: 18px; }
             .rb-grid, .rb-proof, .rb-score-row { grid-template-columns: 1fr; }
@@ -259,6 +295,9 @@ def index_page() -> None:
         "before_score_task": None,
         "cached_before_jd": None,
         "cached_before_score": None,
+        "payments_enabled": True,
+        "support_url": "",
+        "last_error": None,
     }
 
     with ui.column().classes("rb-page"):
@@ -280,62 +319,69 @@ def index_page() -> None:
                     ui.label("Add a PDF, DOCX, or TXT master resume.").classes("rb-subtle")
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("2. Paste the job description").classes("font-medium")
-                    ui.label(
-                        "Use the role details to guide each tailored variation."
-                    ).classes("rb-subtle")
+                    ui.label("Use the role details to guide each tailored variation.").classes(
+                        "rb-subtle"
+                    )
                 with ui.column().classes("rb-soft gap-1"):
                     ui.label("3. Review and export").classes("font-medium")
-                    ui.label(
-                        "Unlock DOCX/PDF exports when the tailored resume is ready."
-                    ).classes("rb-subtle")
+                    ui.label("Unlock DOCX/PDF exports when the tailored resume is ready.").classes(
+                        "rb-subtle"
+                    )
 
             with ui.element("section").classes("rb-grid w-full"):
                 # ── Left: Inputs ──────────────────────────────────────────
                 with ui.column().classes("rb-panel gap-4"):
                     ui.label("Inputs").classes("rb-section-title")
                     status_label = ui.label("Preparing device workspace...").classes("rb-subtle")
-                    provider_select = ui.select(
-                        label="AI model", options={}, value=None
-                    ).classes("w-full")
+                    provider_select = (
+                        ui.select(label="AI model", options={}, value=None)
+                        .props("outlined")
+                        .classes("w-full")
+                    )
                     resume_label = ui.label("No resume uploaded yet.").classes("rb-subtle")
                     upload_status = ui.label("").classes("text-sm")
-                    upload = ui.upload(auto_upload=True).props("accept=.pdf,.txt,.docx").classes(
-                        "w-full"
+                    upload = (
+                        ui.upload(auto_upload=True)
+                        .props("accept=.pdf,.txt,.docx")
+                        .classes("w-full")
                     )
-                    jd_input = ui.textarea("Job description").props("outlined autogrow").classes(
-                        "w-full"
+                    jd_input = (
+                        ui.textarea("Job description").props("outlined autogrow").classes("w-full")
                     )
 
                     # Before-score card (hidden until data available)
                     with ui.element("div").classes("rb-score-card hidden") as before_card:
                         ui.label("Pre-run fit estimate").classes("rb-score-label")
-                        before_score_num = ui.label("—").classes("rb-score-num")
+                        before_score_num = ui.label("-").classes("rb-score-num")
                         before_score_sub = ui.label("").classes("rb-subtle text-xs")
 
                     run_button = ui.button("Tailor resume", icon="auto_awesome").props("unelevated")
                     progress_label = ui.label("Ready").classes("rb-subtle")
                     progress = ui.linear_progress(value=0).props("rounded").classes("w-full")
-                    new_resume_btn = ui.button(
-                        "New resume", icon="add_circle_outline"
-                    ).props("flat").classes("w-full")
+                    new_resume_btn = (
+                        ui.button("New resume", icon="add_circle_outline")
+                        .props("flat")
+                        .classes("w-full")
+                    )
 
                 # ── Right: Output ─────────────────────────────────────────
                 with ui.column().classes("gap-3").style("min-width: 0;"):
-
                     # Score comparison row (hidden until run complete)
                     with ui.element("div").classes("rb-score-row hidden") as score_row:
                         with ui.element("div").classes("rb-score-card"):
                             ui.label("Before tailoring").classes("rb-score-label")
-                            score_before_num = ui.label("—").classes("rb-score-num")
+                            score_before_num = ui.label("-").classes("rb-score-num")
                         with ui.element("div").classes("rb-score-card"):
                             ui.label("After tailoring").classes("rb-score-label")
-                            score_after_num = ui.label("—").classes("rb-score-num")
+                            score_after_num = ui.label("-").classes("rb-score-num")
 
                     # Variant tabs
-                    with ui.card().classes("w-full p-0").style(
-                        "border:1px solid var(--rb-line);"
-                        "border-radius:10px;"
-                        "overflow:hidden;"
+                    with (
+                        ui.card()
+                        .classes("w-full p-0")
+                        .style(
+                            "border:1px solid var(--rb-line);border-radius:10px;overflow:hidden;"
+                        )
                     ):
                         with ui.tabs().classes("w-full") as variant_tabs:
                             ui.tab("conservative", label="Light touch", icon="tune")
@@ -353,12 +399,19 @@ def index_page() -> None:
                             "w-full p-0"
                         ):
                             _tab_cfg = [
-                                ("conservative", "Generate Light Touch", "tune",
-                                 _PLACEHOLDER_GENERATE),
-                                ("balanced", "Generate Standard Fit", "balance",
-                                 "Upload a resume, paste a JD, then start a tailored run."),
-                                ("bold", "Generate Bold Match", "bolt",
-                                 _PLACEHOLDER_GENERATE),
+                                (
+                                    "conservative",
+                                    "Generate Light Touch",
+                                    "tune",
+                                    _PLACEHOLDER_GENERATE,
+                                ),
+                                (
+                                    "balanced",
+                                    "Generate Standard Fit",
+                                    "balance",
+                                    "Upload a resume, paste a JD, then start a tailored run.",
+                                ),
+                                ("bold", "Generate Bold Match", "bolt", _PLACEHOLDER_GENERATE),
                             ]
                             _gen_rows: dict[str, Any] = {}
                             _gen_btns: dict[str, Any] = {}
@@ -375,9 +428,9 @@ def index_page() -> None:
                                                 with ui.row().classes(
                                                     "items-center justify-between w-full"
                                                 ):
-                                                    ui.label(
-                                                        _SECTION_LABELS[_sk]
-                                                    ).classes("rb-section-box-header")
+                                                    ui.label(_SECTION_LABELS[_sk]).classes(
+                                                        "rb-section-box-header"
+                                                    )
                                                     _copy_btn = ui.button(
                                                         icon="content_copy"
                                                     ).props("flat dense round")
@@ -387,9 +440,9 @@ def index_page() -> None:
                                                 ).classes("w-full")
                                     _gen_row = ui.row().classes("gap-2 items-center hidden")
                                     with _gen_row:
-                                        _gen_btn = ui.button(
-                                            _gen_label, icon=_gen_icon
-                                        ).props("unelevated")
+                                        _gen_btn = ui.button(_gen_label, icon=_gen_icon).props(
+                                            "unelevated"
+                                        )
                                         _gen_status = ui.label("").classes("rb-subtle")
                                     _gen_rows[_vname] = _gen_row
                                     _gen_btns[_vname] = _gen_btn
@@ -415,6 +468,8 @@ def index_page() -> None:
                         fit_bullets_col = ui.column().classes("gap-1 mt-2")
 
                     payment_status = ui.label("").classes("rb-subtle")
+                    support_link = ui.link("", "").classes("rb-subtle").style("margin-top:8px;")
+                    support_link.set_visibility(False)
 
     # ── Paywall dialog ─────────────────────────────────────────────────────
     paywall_dialog = ui.dialog()
@@ -442,15 +497,14 @@ def index_page() -> None:
         async def _copy() -> None:
             text = (state["section_texts"].get(vname) or {}).get(sk) or ""
             try:
-                await ui.run_javascript(
-                    f"navigator.clipboard.writeText({json.dumps(text)})"
-                )
+                await ui.run_javascript(f"navigator.clipboard.writeText({json.dumps(text)})")
                 btn.props("icon=check")
                 await asyncio.sleep(1.5)
             except Exception:
                 pass
             finally:
                 btn.props("icon=content_copy")
+
         return _copy
 
     for _v, _sks in _variant_copy_btns.items():
@@ -461,15 +515,17 @@ def index_page() -> None:
         async with api_client() as client:
             resp = await client.get("/api/v1/runs/providers")
         if resp.status_code != 200:
-            provider_select.options = {"huggingface": "Hugging Face"}
-            provider_select.value = "huggingface"
+            provider_select.options = {}
+            provider_select.value = None
             return
         providers = resp.json().get("providers", [])
         options = {p["id"]: p["label"] for p in providers if p.get("configured")}
         if not options:
-            options = {"huggingface": "Hugging Face"}
+            provider_select.options = {}
+            provider_select.value = None
+            return
         provider_select.options = options
-        default = next((p["id"] for p in providers if p.get("is_default")), "huggingface")
+        default = next((p["id"] for p in providers if p.get("is_default")), None)
         provider_select.value = default if default in options else next(iter(options))
 
     async def load_account() -> None:
@@ -488,21 +544,42 @@ def index_page() -> None:
         free_label = "used" if user.get("free_trial_used") else "available"
         upload_label = "yes" if user.get("can_upload") else "payment required"
         price = float(billing.get("price_usd", 3.99))
-        paywall_price.set_text(f"Unlock for {_format_price(price)}")
-        state["stripe_configured"] = billing.get("stripe_configured", False)
-        if not state["stripe_configured"]:
-            stripe_button.props("disable")
-            crypto_status.set_text(
-                "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+        state["payments_enabled"] = _billing_shows_payments(billing)
+        state["support_url"] = billing.get("support_url", "")
+
+        if state["payments_enabled"]:
+            paywall_price.set_visibility(True)
+            paywall_price.set_text(f"Unlock for {_format_price(price)}")
+            stripe_button.set_visibility(True)
+            crypto_button.set_visibility(True)
+            state["stripe_configured"] = billing.get("stripe_configured", False)
+            if not state["stripe_configured"]:
+                stripe_button.props("disable")
+                crypto_status.set_text(
+                    "Stripe is not configured on this server (set STRIPE_SECRET_KEY)."
+                )
+            else:
+                stripe_button.props(remove="disable")
+                if not state.get("poll_payment"):
+                    crypto_status.set_text("")
+            status_label.set_text(
+                f"Free trial: {free_label} · Upload: {upload_label} · "
+                f"Unlock: {_format_price(price)}"
             )
+            support_link.set_visibility(False)
         else:
-            stripe_button.props(remove="disable")
-            if not state.get("poll_payment"):
-                crypto_status.set_text("")
-        status_label.set_text(
-            f"Free trial: {free_label} · Upload: {upload_label} · "
-            f"Unlock: {_format_price(price)}"
-        )
+            paywall_price.set_visibility(False)
+            stripe_button.set_visibility(False)
+            crypto_button.set_visibility(False)
+            status_label.set_text(f"Free workspace - {free_label} runs")
+            if _should_show_support_link(state["payments_enabled"], state["support_url"]):
+                support_link.text = "Built by one developer - support this project"
+                support_link._props["target"] = "_blank"
+                support_link._props["href"] = state["support_url"]
+                support_link.update()
+                support_link.set_visibility(True)
+            else:
+                support_link.set_visibility(False)
         if resumes:
             match = None
             if state.get("resume_id"):
@@ -536,7 +613,7 @@ def index_page() -> None:
             return
         if state.get("cached_before_jd") == jd_text:
             return
-        provider = provider_select.value or "huggingface"
+        provider = provider_select.value or DEFAULT_PROVIDER.value
         async with api_client() as client:
             resp = await client.post(
                 "/api/v1/score/preview",
@@ -547,7 +624,7 @@ def index_page() -> None:
             overall = data.get("overall")
             if overall is not None:
                 before_score_num.set_text(f"{overall:.0f}")
-                before_score_sub.set_text("out of 100 — before tailoring")
+                before_score_sub.set_text("out of 100 - before tailoring")
                 before_card.classes(remove="hidden")
                 state["cached_before_score"] = overall
                 state["cached_before_jd"] = jd_text
@@ -556,9 +633,11 @@ def index_page() -> None:
         task = state.get("before_score_task")
         if task and not task.done():
             task.cancel()
+
         async def _delayed():
             await asyncio.sleep(1.5)
             await _compute_before_score()
+
         state["before_score_task"] = asyncio.create_task(_delayed())
 
     jd_input.on("update:model-value", lambda _: asyncio.create_task(schedule_before_score()))
@@ -619,7 +698,7 @@ def index_page() -> None:
                 gen_row.classes(add="hidden")
             else:
                 for md in section_mds.values():
-                    md.set_content(random.choice(_RESUME_QUOTES))
+                    md.set_content(_EMPTY_SECTION)
                 gen_row.classes(remove="hidden")
 
     def _display_fit_assessment(final_output: dict) -> None:
@@ -654,7 +733,10 @@ def index_page() -> None:
         state["current_run"] = body
         apply_form_from_state(body)
 
-        is_locked = bool(body.get("output_locked")) and not body.get("final_output")
+        payments_enabled = state.get("payments_enabled", True)
+        is_locked = (
+            payments_enabled and bool(body.get("output_locked")) and not body.get("final_output")
+        )
         if is_locked:
             export_row.classes(add="hidden")
             fit_panel.classes(add="hidden")
@@ -663,9 +745,9 @@ def index_page() -> None:
             preview = body.get("preview_text") or "Payment required."
             _variant_sections["balanced"]["summary"].set_content(f"**Preview**\n\n{preview}")
             for sk in list(SECTION_KEYS)[1:]:
-                _variant_sections["balanced"][sk].set_content(random.choice(_RESUME_QUOTES))
+                _variant_sections["balanced"][sk].set_content(_EMPTY_SECTION)
             payment_status.set_text("Payment required to reveal the full tailored resume.")
-            # Show scores as a teaser even when locked — API returns these unconditionally
+            # Show scores as a teaser even when locked - API returns these unconditionally
             _sb = body.get("ats_score_before")
             _sa = body.get("ats_score_after")
             if _sb is not None or _sa is not None:
@@ -674,7 +756,7 @@ def index_page() -> None:
                 score_row.classes(remove="hidden")
             else:
                 score_row.classes(add="hidden")
-            if show_paywall or body.get("status") == "completed":
+            if payments_enabled and (show_paywall or body.get("status") == "completed"):
                 paywall_dialog.open()
             return body
 
@@ -693,7 +775,7 @@ def index_page() -> None:
             # update before card in inputs panel too
             if score_before_val is not None:
                 before_score_num.set_text(f"{score_before_val:.0f}")
-                before_score_sub.set_text("out of 100 — before tailoring")
+                before_score_sub.set_text("out of 100 - before tailoring")
                 before_card.classes(remove="hidden")
 
         # Variant outputs
@@ -719,6 +801,24 @@ def index_page() -> None:
                 docx_btn.props("disable")
                 pdf_btn.props("disable")
         return body
+
+    def _show_run_error(message: str) -> None:
+        """Show one clean, human error state after a failed run.
+
+        Resets the progress bar, replaces the status label with a sanitized
+        message, clears any lingering joke-placeholder text from the variant
+        panels, and hides the export row.
+        """
+        clean = _sanitize_run_error(message)
+        progress.value = 0
+        progress_label.set_text("Run failed")
+        payment_status.classes(remove="rb-subtle")
+        payment_status.classes(add="rb-danger")
+        payment_status.set_text(clean)
+        export_row.classes(add="hidden")
+        for _vn in _variant_wrappers:
+            for _sk in SECTION_KEYS:
+                _variant_sections[_vn][_sk].set_content("")
 
     def _wire_variant_gen_button(variant_name: str) -> None:
         gen_row, gen_btn, gen_status = _variant_gen_rows[variant_name]
@@ -747,7 +847,7 @@ def index_page() -> None:
                     gen_status.set_text("")
                     await refresh_run()
                 else:
-                    gen_status.set_text("Variant generated — reload to view.")
+                    gen_status.set_text("Variant generated - reload to view.")
             else:
                 gen_status.set_text(_format_detail(resp.text, "Generation failed"))
 
@@ -818,6 +918,7 @@ def index_page() -> None:
 
     async def stream_progress(run_id: str) -> str:
         def _update(label: str, value: float) -> None:
+            state["last_error"] = label
             progress_label.set_text(label)
             progress.value = value
 
@@ -843,23 +944,25 @@ def index_page() -> None:
             "tailor: submit clicked",
             resume_id=resume_id,
             jd_chars=len(jd_text),
-            provider=provider_select.value or "huggingface",
+            provider=provider_select.value or DEFAULT_PROVIDER.value,
         )
         run_button.props("loading")
         progress.value = 0.05
         progress_label.set_text("Creating run")
         payment_status.set_text("")
+        payment_status.classes(remove="rb-danger")
+        payment_status.classes(add="rb-subtle")
         for _vn in _variant_wrappers:
             _variant_wrappers[_vn].classes(remove="rb-locked")
         for _sk in SECTION_KEYS:
             _variant_sections["balanced"][_sk].set_content(
-                _PLACEHOLDER_LOADING if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_LOADING if _sk == "summary" else _EMPTY_SECTION
             )
             _variant_sections["conservative"][_sk].set_content(
-                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_GENERATE if _sk == "summary" else _EMPTY_SECTION
             )
             _variant_sections["bold"][_sk].set_content(
-                _PLACEHOLDER_GENERATE if _sk == "summary" else random.choice(_RESUME_QUOTES)
+                _PLACEHOLDER_GENERATE if _sk == "summary" else _EMPTY_SECTION
             )
         conservative_gen_row.classes(add="hidden")
         bold_gen_row.classes(add="hidden")
@@ -875,18 +978,18 @@ def index_page() -> None:
                     user,
                     resume_id=UUID(str(resume_id)),
                     jd_text=jd_text,
-                    llm_provider=provider_select.value or "huggingface",
+                    llm_provider=provider_select.value or DEFAULT_PROVIDER.value,
                     variant=DEFAULT_VARIANT.value,
                 )
         except RunLaunchError as exc:
             log_console("tailor: run creation failed", level="error", detail=exc.detail)
             run_button.props(remove="loading")
-            _variant_sections["balanced"]["summary"].set_content(exc.detail)
+            _show_run_error(exc.detail)
             return
         except Exception as exc:
             log_console("tailor: unexpected error", level="error", detail=str(exc))
             run_button.props(remove="loading")
-            _variant_sections["balanced"]["summary"].set_content(f"Could not start run: {exc}")
+            _show_run_error(f"Could not start run: {exc}")
             return
 
         log_console("tailor: run created", run_id=data["run_id"], status=data.get("status"))
@@ -904,7 +1007,7 @@ def index_page() -> None:
             )
             log_console("tailor: progress finished", run_id=data["run_id"], result=result)
             if result == "error":
-                await refresh_run(show_paywall=False)
+                _show_run_error(state.get("last_error") or "")
                 return
         finally:
             run_button.props(remove="loading")
@@ -928,43 +1031,48 @@ def index_page() -> None:
         if task and not task.done():
             task.cancel()
         # Clear run state; keep resume_id so the same master resume stays selected
-        state.update({
-            "run_id": None,
-            "jd_text": None,
-            "payment_id": None,
-            "poll_payment": False,
-            "section_texts": {},
-            "current_run": None,
-            "cached_before_jd": None,
-            "cached_before_score": None,
-            "before_score_task": None,
-        })
+        state.update(
+            {
+                "run_id": None,
+                "jd_text": None,
+                "payment_id": None,
+                "poll_payment": False,
+                "section_texts": {},
+                "current_run": None,
+                "cached_before_jd": None,
+                "cached_before_score": None,
+                "before_score_task": None,
+            }
+        )
         await clear_browser_workflow()
         # Reset input fields
         jd_input.value = ""
         upload_status.set_text("")
         upload_status.classes(remove="rb-danger rb-success")
         before_card.classes(add="hidden")
-        before_score_num.set_text("—")
+        before_score_num.set_text("-")
         before_score_sub.set_text("")
         progress_label.set_text("Ready")
         progress.value = 0
         # Reset output panel
         score_row.classes(add="hidden")
-        score_before_num.set_text("—")
-        score_after_num.set_text("—")
+        score_before_num.set_text("-")
+        score_after_num.set_text("-")
         fit_panel.classes(add="hidden")
         fit_bullets_col.clear()
         export_row.classes(add="hidden")
         export_row.clear()
         payment_status.set_text("")
+        payment_status.classes(remove="rb-danger")
+        payment_status.classes(add="rb-subtle")
         paywall_dialog.close()
         for _vn in _variant_wrappers:
             _variant_wrappers[_vn].classes(remove="rb-locked")
         for _sk in SECTION_KEYS:
             _variant_sections["balanced"][_sk].set_content(
                 "Upload a resume, paste a JD, then start a tailored run."
-                if _sk == "summary" else ""
+                if _sk == "summary"
+                else ""
             )
             _variant_sections["conservative"][_sk].set_content(
                 _PLACEHOLDER_GENERATE if _sk == "summary" else ""
@@ -1013,7 +1121,7 @@ def index_page() -> None:
         apply_form_from_state()
         if state.get("run_id"):
             if state.get("poll_payment"):
-                # Returning from payment redirect — restore run and unlock output
+                # Returning from payment redirect - restore run and unlock output
                 await sync_payment_status()
                 await refresh_run(show_paywall=True)
                 body = state.get("current_run") or {}
@@ -1022,7 +1130,7 @@ def index_page() -> None:
                     paywall_dialog.close()
                     await clear_browser_workflow()
             else:
-                # Regular page load — start fresh, do not show stale run output or scores
+                # Regular page load - start fresh, do not show stale run output or scores
                 state["run_id"] = None
                 await clear_browser_workflow()
                 await schedule_before_score()

@@ -129,7 +129,7 @@ async def test_add_section_and_retailor(session, monkeypatch):
         master_resume_id=resume.id,
         jd_text="jd " * 10,
         output_locked=False,
-        llm_provider="huggingface",
+        llm_provider="openai",
         final_output={**_sample_final_output(), "sections_missing": ["education"]},
     )
     session.add(run)
@@ -186,7 +186,7 @@ async def test_generate_variant_adds_requested_variant(session, monkeypatch):
         master_resume_id=resume.id,
         jd_text="Python API developer " * 3,
         output_locked=False,
-        llm_provider="huggingface",
+        llm_provider="openai",
         final_output=final,
     )
     session.add(run)

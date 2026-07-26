@@ -11,6 +11,6 @@ Dev-only file. **Never merge to `main`.**
 
 ## Payment wall
 
-- `output_locked=true` on runs after free trial
+- `output_locked=true` on runs after the free trial when payments are enabled; disabled payments keep runs unlocked
 - API must never leak `final_output` when locked
 - Stripe/crypto webhooks unlock via `AccessService.unlock_run()`

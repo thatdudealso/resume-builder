@@ -7,6 +7,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
+from apps.web.config import settings
 from packages.core.schemas.access import AccessSnapshot, RunAccessDecision, RunAccessMode
 from packages.db.models.agent_run import AgentRun
 from packages.db.models.payment import Payment
@@ -68,7 +69,7 @@ class AccessService:
         if user is None:
             raise ValueError("User not found")
         has_payment = await self.has_active_payment_window(user_id)
-        can_upload = not user.free_trial_used or has_payment
+        can_upload = not settings.payments_enabled or not user.free_trial_used or has_payment
         return AccessSnapshot(
             user_id=user_id,
             free_trial_used=user.free_trial_used,
@@ -77,13 +78,13 @@ class AccessService:
         )
 
     async def can_upload_resume(self, user_id: UUID) -> bool:
+        if not settings.payments_enabled:
+            return True
         if await self.has_active_payment_window(user_id):
             return True
 
         result = await self.session.execute(
-            select(func.count())
-            .select_from(MasterResume)
-            .where(MasterResume.user_id == user_id)
+            select(func.count()).select_from(MasterResume).where(MasterResume.user_id == user_id)
         )
         count = result.scalar() or 0
         return count < 1
@@ -92,6 +93,8 @@ class AccessService:
         user = await self.get_user(user_id)
         if user is None:
             return RunAccessDecision(mode=RunAccessMode.BLOCKED, message="User not found")
+        if not settings.payments_enabled:
+            return RunAccessDecision(mode=RunAccessMode.FREE)
         if not user.free_trial_used:
             return RunAccessDecision(mode=RunAccessMode.FREE)
         if await self.has_active_payment_window(user_id):
@@ -104,6 +107,8 @@ class AccessService:
     async def can_view_output(self, user_id: UUID, run: AgentRun) -> bool:
         if run.user_id != user_id:
             return False
+        if not settings.payments_enabled:
+            return True
         if not run.output_locked:
             return True
         if run.payment_id:
@@ -124,6 +129,8 @@ class AccessService:
     async def can_export(self, user_id: UUID, run: AgentRun) -> bool:
         if not await self.can_view_output(user_id, run):
             return False
+        if not settings.payments_enabled:
+            return True
         if run.is_free_trial_run:
             return True
         return run.payment_id is not None

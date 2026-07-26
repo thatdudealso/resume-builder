@@ -15,7 +15,11 @@ async def test_list_providers_endpoint(client):
     resp = await client.get("/api/v1/runs/providers")
     assert resp.status_code == 200
     providers = resp.json()["providers"]
-    assert any(item["id"] == "huggingface" for item in providers)
+    assert len(providers) == 4
+    ids = {item["id"] for item in providers}
+    assert ids == {"openai", "anthropic", "gemini", "grok"}
+    default_ids = [item["id"] for item in providers if item.get("is_default")]
+    assert default_ids == ["openai"]
 
 
 @pytest.mark.asyncio
