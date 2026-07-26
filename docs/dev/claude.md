@@ -147,7 +147,7 @@ resume-builder/
 │   │   ├── apps/                    # run_executor unit tests
 │   │   ├── core/                    # AccessService, JWT, passwords
 │   │   ├── export/                  # pdf_ingest, docx_export
-│   │   └── integrations/            # HF/stripe/S3 client tests (mocked)
+│   │   └── integrations/            # LLM/Stripe/S3 client tests (mocked)
 │   ├── integration/
 │   │   ├── api/                     # Full HTTP round-trips via httpx AsyncClient
 │   │   └── webhooks/                # Stripe + crypto webhook integration tests
@@ -298,8 +298,8 @@ POST /runs
       → get_checkpointer(settings.database_url)  # AsyncPostgresSaver
       → run_agent(initial, llm_complete, checkpointer=cp)
           → prepare_inputs  (deterministic: pdfplumber + TF-IDF)
-          → rewrite_sections  (HF call 1)
-          → validate_output   (HF call 2)
+          → rewrite_sections  (LLM call 1)
+          → validate_output   (LLM call 2)
           → format_output     (deterministic)
       → AgentRun.final_output = result["final_output"]
       → AccessService.mark_free_trial_used(user_id)
@@ -340,7 +340,7 @@ execute_run() starts → get_checkpointer() → run_agent(..., checkpointer=cp)
 Container restarts → execute_run() called again for same run_id
   → run_agent with same run_id → ainvoke with same thread_id
   → LangGraph finds checkpoint → resumes from validate_output
-  → No re-execution of prepare_inputs or rewrite_sections (no wasted HF calls)
+  → No re-execution of prepare_inputs or rewrite_sections (no wasted provider calls)
 ```
 
 ---
@@ -488,7 +488,7 @@ async with get_checkpointer(settings.database_url) as checkpointer:
 
 **HTTP tests:** `httpx.AsyncClient(transport=ASGITransport(app=app))`
 
-**All external services are mocked** — HF, Stripe, NOWPayments, S3, boto3
+**All external services are mocked** — LLM providers, Stripe, NOWPayments, S3, boto3
 
 **Coverage gate:** 85% (`--cov-fail-under=85`) — run with:
 ```bash
