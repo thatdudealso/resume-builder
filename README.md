@@ -1,15 +1,33 @@
-# Resume Builder
+# ResumeBild
 
-AI-powered resume tailoring: upload a master resume, paste a job description, and get an ATS-optimized rewrite that stays grounded in your real experience (no invented facts).
+**Tailor your resume without inventing facts.**
 
-The app runs as a single FastAPI service with a NiceGUI frontend, LangGraph agents, PostgreSQL, Redis, and S3-compatible storage. Payments are optional: when enabled, runs after the free trial are paywalled ($3.99 unlock via Stripe or crypto); when disabled, the workspace is free and unlimited.
+Upload a master resume, paste a job description, and get three tailored variations - Light Touch, Standard Fit, Bold Match - each scored against the job so you know how well it actually fits. Edit any section inline, then export to PDF, DOCX, or TXT.
+
+![ResumeBild UI - upload, tailor, and review variants with a job-fit score](docs/assets/resumebild-ui.png)
+
+## Why it's different
+
+Most "AI resume tailoring" tools rewrite freely and let the model pad in skills or metrics you never had. ResumeBild's agents stay grounded in your real experience - they rephrase, reorder, and emphasize what's already there instead of fabricating roles, skills, or numbers. The result is one honest, ATS-friendly resume per application, not a generic one sent everywhere.
+
+- **Free to use.** Payment is an optional gesture to support server costs, never a requirement.
+- **Your model, your choice.** Pick the AI provider in the UI; only the providers you've configured show up.
+- **Private by default.** Runs in a private workspace tied to your device, no account required.
+
+## How it works
+
+1. **Upload** your master resume (PDF, DOCX, or TXT).
+2. **Paste** the job description you're applying to.
+3. **Review and export** - compare the three variants and their job-fit scores, edit any section inline, then download the one you want.
 
 ---
+
+The rest of this README is the operator manual: running the app locally, configuring environment variables, and contributing.
 
 ## Table of contents
 
 - [Prerequisites](#prerequisites)
-- [Quick start (Docker — recommended)](#quick-start-docker--recommended)
+- [Quick start (Docker - recommended)](#quick-start-docker---recommended)
 - [Configure environment variables](#configure-environment-variables)
 - [MinIO bucket bootstrap](#4-minio-bucket-bootstrap)
 - [Use the app](#use-the-app)
@@ -39,7 +57,7 @@ The app runs as a single FastAPI service with a NiceGUI frontend, LangGraph agen
 
 ---
 
-## Quick start (Docker — recommended)
+## Quick start (Docker - recommended)
 
 ### 1. Clone the repository
 
@@ -54,7 +72,7 @@ cd resume-builder
 cp .env.example .env
 ```
 
-Edit `.env` and add at least one LLM API key (see [LLM providers](#llm-providers)). For a first smoke test you can leave keys empty — the agent falls back to mock responses, but tailoring quality will not be useful until a provider is configured.
+Edit `.env` and add at least one LLM API key (see [LLM providers](#llm-providers)). For a first smoke test you can leave keys empty - the agent falls back to mock responses, but tailoring quality will not be useful until a provider is configured.
 
 ### 3. Start all services
 
@@ -69,7 +87,7 @@ This starts:
 | `postgres` | Application database             | 5432      |
 | `redis`    | Rate limiting / caching          | 6379      |
 | `minio`    | S3-compatible file storage       | 9000, 9001 |
-| `migrate`  | Runs Alembic migrations (once)   | —         |
+| `migrate`  | Runs Alembic migrations (once)   | -         |
 | `web`      | FastAPI + NiceGUI app            | 8000      |
 
 Migrations run automatically via the `migrate` service before `web` starts. Migrations are **never** auto-run inside the web process itself.
@@ -124,8 +142,6 @@ Never commit `.env` or real API keys to git.
 
 ---
 
----
-
 ## Use the app
 
 ### Main workflow (`/app`)
@@ -173,7 +189,7 @@ Supported providers (selectable on `/app` and the dashboard; default is OpenAI):
 | Google Gemini | `GEMINI_API_KEY` | |
 | xAI Grok | `XAI_API_KEY` | |
 
-If a provider’s API key is missing, the agent uses deterministic mock completions so the app still runs locally — useful for UI testing, not for real tailoring.
+If a provider's API key is missing, the agent uses deterministic mock completions so the app still runs locally - useful for UI testing, not for real tailoring.
 
 **Minimum for real runs:** set `OPENAI_API_KEY` (or configure another provider and choose it on the dashboard).
 
@@ -388,7 +404,7 @@ resume-builder/
 
 Feature work: branch from `develop` as `feature/<name>`, open a PR into `develop`.
 
-Engineering plans and status (private dev docs) live on `develop` under `docs/dev/plans/` — not shipped to production `main`.
+Engineering plans and status (private dev docs) live on `develop` under `docs/dev/plans/` - not shipped to production `main`.
 
 ---
 
