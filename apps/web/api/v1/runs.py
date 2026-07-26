@@ -293,7 +293,7 @@ async def generate_run_variant(
         raise HTTPException(
             status_code=503,
             detail=(
-                f"LLM provider error — try again or switch to a different model."
+                f"LLM provider error - try again or switch to a different model."
                 f" ({type(exc).__name__})"
             ),
         ) from exc
