@@ -24,7 +24,7 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     if settings.env not in ("test",):
         await ensure_checkpointer_schema(settings.database_url)
-        ensure_bucket_exists()
+        await ensure_bucket_exists()
     yield
 
 

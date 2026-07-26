@@ -12,7 +12,7 @@ def _client_error(status: int) -> ClientError:
     )
 
 
-def test_creates_bucket_when_missing():
+async def test_creates_bucket_when_missing():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(404)
     with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
@@ -20,21 +20,21 @@ def test_creates_bucket_when_missing():
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
-        ensure_bucket_exists()
+        await ensure_bucket_exists()
     client.create_bucket.assert_called_once_with(Bucket="resume-builder")
 
 
-def test_skips_when_no_endpoint():
+async def test_skips_when_no_endpoint():
     client = MagicMock()
     with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
          patch("apps.web.services.s3_bootstrap.settings") as s:
         s.env = "local"
         s.s3_endpoint = None
-        ensure_bucket_exists()
+        await ensure_bucket_exists()
     client.create_bucket.assert_not_called()
 
 
-def test_does_not_create_on_access_denied():
+async def test_does_not_create_on_access_denied():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(403)
     with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
@@ -42,11 +42,11 @@ def test_does_not_create_on_access_denied():
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
-        ensure_bucket_exists()
+        await ensure_bucket_exists()
     client.create_bucket.assert_not_called()
 
 
-def test_connection_failure_does_not_create_or_raise():
+async def test_connection_failure_does_not_create_or_raise():
     client = MagicMock()
     client.head_bucket.side_effect = OSError("connection refused")
     with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
@@ -54,11 +54,13 @@ def test_connection_failure_does_not_create_or_raise():
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
-        ensure_bucket_exists()
+        with patch("apps.web.services.s3_bootstrap.asyncio.sleep") as sleep:
+            await ensure_bucket_exists()
+    assert sleep.call_count == 9
     client.create_bucket.assert_not_called()
 
 
-def test_create_failure_does_not_abort_startup():
+async def test_create_failure_does_not_abort_startup():
     client = MagicMock()
     client.head_bucket.side_effect = _client_error(404)
     client.create_bucket.side_effect = OSError("endpoint down")
@@ -67,16 +69,32 @@ def test_create_failure_does_not_abort_startup():
         s.env = "local"
         s.s3_endpoint = "http://minio:9000"
         s.s3_bucket = "resume-builder"
-        ensure_bucket_exists()
-    client.create_bucket.assert_called_once()
+        with patch("apps.web.services.s3_bootstrap.asyncio.sleep") as sleep:
+            await ensure_bucket_exists()
+    assert sleep.call_count == 9
+    assert client.create_bucket.call_count == 10
 
 
-def test_skips_bootstrap_outside_local_and_dev():
+async def test_retries_until_s3_is_ready():
+    client = MagicMock()
+    client.head_bucket.side_effect = [OSError("starting"), None]
+    with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
+         patch("apps.web.services.s3_bootstrap.settings") as s, \
+         patch("apps.web.services.s3_bootstrap.asyncio.sleep") as sleep:
+        s.env = "local"
+        s.s3_endpoint = "http://minio:9000"
+        s.s3_bucket = "resume-builder"
+        await ensure_bucket_exists()
+    assert client.head_bucket.call_count == 2
+    sleep.assert_called_once_with(1)
+
+
+async def test_skips_bootstrap_outside_local_and_dev():
     client = MagicMock()
     with patch("apps.web.services.s3_bootstrap.get_s3_client", return_value=client), \
          patch("apps.web.services.s3_bootstrap.settings") as s:
         s.env = "qa"
         s.s3_endpoint = "http://minio:9000"
-        ensure_bucket_exists()
+        await ensure_bucket_exists()
     client.head_bucket.assert_not_called()
     client.create_bucket.assert_not_called()
