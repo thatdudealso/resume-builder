@@ -37,9 +37,12 @@ def decode_cognito_jwt(token: str) -> dict[str, Any] | None:
             issuer=issuer,
             options={"verify_aud": False},
         )
+        if payload.get("token_use") != "id":
+            logger.warning("Rejecting Cognito token with token_use=%s", payload.get("token_use"))
+            return None
         expected_client_id = (settings.cognito_app_client_id or "").strip() or None
         if expected_client_id:
-            aud = payload.get("aud") or payload.get("client_id")
+            aud = payload.get("aud")
             if aud and aud != expected_client_id:
                 logger.warning("Cognito token client id mismatch")
                 return None

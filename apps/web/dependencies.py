@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.web.config import settings
-from packages.core.security.cognito import decode_cognito_jwt
 from packages.core.security.jwt import ACCESS_COOKIE, decode_access_token, hash_ip
 from packages.core.security.passwords import hash_password
 from packages.db.models.device_session import DeviceSession
@@ -137,16 +136,11 @@ async def get_current_user_id(
         if user_id is not None:
             return user_id
 
-        if settings.cognito_enabled:
-            payload = decode_cognito_jwt(token)
-            if payload is not None:
-                user = await get_or_create_cognito_user(session, payload)
-                await session.commit()
-                return user.id
-
+        # Production Cognito hard-gate uses the exchange endpoint to mint
+        # ResumeBild cookies. Do not accept raw Cognito bearer tokens here.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    if settings.cognito_enabled:
+    if settings.env == "production" or settings.cognito_enabled:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     return await _get_or_create_device_user_id(request, session)

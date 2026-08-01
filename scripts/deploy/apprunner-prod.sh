@@ -159,8 +159,58 @@ aws apprunner associate-custom-domain \
   --domain-name "${DOMAIN}" \
   --no-enable-www-subdomain >/dev/null 2>&1 || true
 
-aws apprunner describe-custom-domains --service-arn "${SERVICE_ARN}" \
-  --query 'CustomDomains[0].{Status:Status,CertificateValidationRecords:CertificateValidationRecords}' \
-  --output json
+DOMAIN_INFO="$(aws apprunner describe-custom-domains --service-arn "${SERVICE_ARN}" --output json)"
+echo "${DOMAIN_INFO}" | python3 - <<'PY'
+import json,sys
+info=json.load(sys.stdin)
+domains=info.get("CustomDomains") or []
+if not domains:
+    print("No custom domain association found yet")
+    raise SystemExit(0)
+d=domains[0]
+print(f"custom_domain_status={d.get('Status')}")
+for rec in d.get("CertificateValidationRecords") or []:
+    print(f"validation_cname={rec.get('Name')}->{rec.get('Value')}")
+PY
+
+# Upsert Route53 alias to the App Runner domain target when certificate validation records exist.
+HOSTED_ZONE_ID="${HOSTED_ZONE_ID:-Z04820823MQE3EMJX7VND}"
+APP_RUNNER_DNS="$(aws apprunner describe-service --service-arn "${SERVICE_ARN}" --query Service.ServiceUrl --output text)"
+# App Runner custom domains use alias to the service URL hostname.
+python3 - <<PY
+import json,subprocess,os
+hosted=os.environ.get("HOSTED_ZONE_ID","${HOSTED_ZONE_ID}")
+domain="${DOMAIN}"
+target="${APP_RUNNER_DNS}"
+# Prefer App Runner regional dualstack target if provided via cert records DNSTarget
+info=json.loads(subprocess.check_output([
+  "aws","apprunner","describe-custom-domains","--service-arn","${SERVICE_ARN}","--output","json"
+], text=True))
+dns_target = None
+for d in info.get("CustomDomains") or []:
+    dns_target = d.get("DNSTarget") or dns_target
+if dns_target:
+    target = dns_target
+change={
+  "Comment": f"ResumeBild App Runner alias for {domain}",
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": domain,
+      "Type": "A",
+      "AliasTarget": {
+        "HostedZoneId": "Z01915732ZBZKC8SH57SF",
+        "DNSName": target if target.endswith(".") else target+".",
+        "EvaluateTargetHealth": True
+      }
+    }
+  }]
+}
+# App Runner hosted zone IDs vary by region; discover from validation if needed.
+open("/tmp/resumebild-route53.json","w").write(json.dumps(change))
+print(f"route53_upsert={domain}->{target}")
+PY
+aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch file:///tmp/resumebild-route53.json >/dev/null
+rm -f /tmp/resumebild-route53.json
 
 echo "Done. Verify: curl -fsS https://${DOMAIN}/health"
