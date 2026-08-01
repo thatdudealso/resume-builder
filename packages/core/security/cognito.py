@@ -24,9 +24,10 @@ def _fetch_json_ipv4(url: str, timeout: float = 10.0) -> dict[str, Any]:
     path = parsed.path or "/"
     if parsed.query:
         path = f"{path}?{parsed.query}"
-    addr = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)[0][4]
+    sockaddr = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)[0][4]
+    address = (str(sockaddr[0]), int(sockaddr[1]))
     context = ssl.create_default_context()
-    with socket.create_connection(addr, timeout=timeout) as raw:
+    with socket.create_connection(address, timeout=timeout) as raw:
         with context.wrap_socket(raw, server_hostname=host) as sock:
             req = (
                 f"GET {path} HTTP/1.1\r\n"
@@ -49,11 +50,14 @@ def _fetch_json_ipv4(url: str, timeout: float = 10.0) -> dict[str, Any]:
         # Accept "HTTP/1.1 200 OK"
         if " 200" not in status_line:
             raise RuntimeError(f"JWKS fetch failed: {status_line}")
-    return json.loads(body.decode())
+    payload = json.loads(body.decode())
+    if not isinstance(payload, dict):
+        raise RuntimeError("JWKS response must be a JSON object")
+    return payload
 
 
 class _IPv4PyJWKClient(PyJWKClient):
-    def fetch_data(self) -> Any:  # type: ignore[override]
+    def fetch_data(self) -> Any:
         return _fetch_json_ipv4(self.uri)
 
 

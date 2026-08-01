@@ -31,13 +31,14 @@ Dev-only file. **Never merge to `main`.**
 ## Frontend rules
 
 - Keep the product screen simple and task-oriented; do not add a marketing landing page.
-- The NiceGUI frontend has one user-facing page at `/app/`. Do not add
-  login, registration, dashboard, account, or other product pages.
-- Never add user-facing login, registration, logout, password, or account-creation
-  functionality. Upload, tailoring, paywall, payment return polling, and exports
-  all live on the home page.
-- Set and reuse a stable `rb_device_fingerprint` cookie, then send it as
-  `X-Device-Fingerprint` on API calls.
+- The NiceGUI frontend has one user-facing product page at `/app/`. Do not add
+  dashboard, account, or other product pages. Production authentication uses the
+  external Cognito handoff; see `README.md` for the authoritative behavior.
+- Do not add locally owned credential login, registration, logout, password, or
+  account-creation functionality. Upload, tailoring, paywall, payment return
+  polling, and exports all live on the home page.
+- Local development uses a stable `rb_device_fingerprint` cookie and sends it as
+  `X-Device-Fingerprint` on API calls. Production uses ResumeBild-only session cookies.
 - Use backend access flags as the source of truth. Do not reveal `final_output`
   when `output_locked=true`.
 - When payments are enabled, show locked previews with the paywall, then poll run
@@ -48,9 +49,10 @@ Dev-only file. **Never merge to `main`.**
 
 ## Backend contracts
 
-- Protected APIs create or reuse a private device workspace from
-  `X-Device-Fingerprint` when no token is present.
-- `/api/v1/auth/me` returns free-trial and upload state for the current device workspace.
+- Protected APIs use ResumeBild session cookies in Cognito-enabled or production
+  environments; local development creates or reuses a private device workspace from
+  `X-Device-Fingerprint`.
+- `/api/v1/auth/me` returns free-trial and upload state for the current workspace.
 - `/api/v1/resumes` uploads and lists resumes scoped to the current user.
 - `/api/v1/runs` creates runs; `/api/v1/runs/{run_id}/stream` emits SSE progress.
 - `/api/v1/billing/stripe/checkout` and `/api/v1/billing/crypto/invoice` create payments when payments are enabled; disabled mode returns a clear service-unavailable response.

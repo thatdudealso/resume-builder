@@ -47,7 +47,9 @@ def test_fetch_jwks_forces_ipv4_and_preserves_tls_host(monkeypatch):
         lambda: FakeTlsContext(),
     )
 
-    assert _fetch_json_ipv4("https://cognito.example/.well-known/jwks.json?pool=prod") == {"keys": []}
+    assert _fetch_json_ipv4(
+        "https://cognito.example/.well-known/jwks.json?pool=prod"
+    ) == {"keys": []}
     assert calls["address_lookup"] == (
         "cognito.example",
         443,

@@ -128,6 +128,7 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `AUTH_LOGIN_URL` | No | Login endpoint that receives the validated `return_url` during Cognito handoff |
 | `AUTH_RETURN_ALLOWLIST` | No | Comma-separated allowed callback origins. Include `PUBLIC_BASE_URL` in production. |
 | `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION` | Required in production | Enable Cognito authentication. Leave the pool ID and client ID empty only for local device-based authentication. |
+| `RUN_MIGRATIONS_ON_START` | No | Container startup runs `alembic upgrade head` when `true` (default). Set to `false` only when migrations run separately. |
 | `S3_ENDPOINT` | Local | Set to `http://minio:9000` for MinIO; leave empty for AWS S3 |
 | `S3_BUCKET` | Yes | Bucket name, default `resume-builder` |
 | `S3_PREFIX` | No | Prefix applied to every object key, for sharing a bucket between deployments |
@@ -296,9 +297,10 @@ uvicorn apps.web.main:app --host 0.0.0.0 --port 8000 --reload
 
 Open http://localhost:8000/app
 
-### Optional: seed a dev user
+### Optional: seed a local API user
 
-The NiceGUI flow uses device fingerprints, not login. If you need a registered user for API testing:
+Local NiceGUI uses device fingerprints rather than login. If you need a registered user for local
+API testing:
 
 ```bash
 python scripts/seed_dev.py
@@ -309,7 +311,9 @@ python scripts/seed_dev.py
 
 ## Database migrations
 
-Migrations use Alembic and live in `migrations/versions/`. They are **never** applied on app startup.
+Migrations use Alembic and live in `migrations/versions/`. The container entrypoint runs them before
+starting the web process by default; set `RUN_MIGRATIONS_ON_START=false` only when migrations are
+managed separately. For local development, run them explicitly:
 
 **Docker:**
 

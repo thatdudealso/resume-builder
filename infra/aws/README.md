@@ -14,8 +14,8 @@
 
 ```bash
 # Build and push a linux/amd64 image, then ensure the ECR repo, App Runner
-# service, custom domain, Route53 CNAME records, VPC connector, resumebild
-# database, and per-runtime Secrets Manager secrets.
+# service, custom domain, Route53 CNAME records, VPC connector, and per-runtime
+# Secrets Manager secrets for the existing resumebild database connection.
 bash scripts/deploy/apprunner-prod.sh
 ```
 

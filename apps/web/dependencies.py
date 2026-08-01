@@ -92,7 +92,11 @@ async def get_or_create_cognito_user(session: AsyncSession, payload: dict[str, A
     cognito_sub = str(payload["sub"])
     email_verified = payload.get("email_verified") is True
     claimed_email = str(payload.get("email") or "").lower()
-    email = claimed_email if email_verified and claimed_email else f"cognito-{cognito_sub}@resume-builder.local"
+    email = (
+        claimed_email
+        if email_verified and claimed_email
+        else f"cognito-{cognito_sub}@resume-builder.local"
+    )
     result = await session.execute(select(User).where(User.cognito_sub == cognito_sub))
     user = result.scalar_one_or_none()
     if user is not None:
