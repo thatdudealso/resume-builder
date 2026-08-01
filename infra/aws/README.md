@@ -13,8 +13,9 @@
 ## Provisioning
 
 ```bash
-# Create ECR repo, Secrets Manager secret, App Runner service, custom domain,
-# Route53 alias, VPC connector, and resumebild database.
+# Build and push a linux/amd64 image, then ensure the ECR repo, App Runner
+# service, custom domain, Route53 CNAME records, VPC connector, resumebild
+# database, and per-runtime Secrets Manager secrets.
 bash scripts/deploy/apprunner-prod.sh
 ```
 

@@ -29,6 +29,7 @@ from packages.db.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)

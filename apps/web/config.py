@@ -68,8 +68,7 @@ class Settings(BaseSettings):
     @property
     def cognito_enabled(self) -> bool:
         return bool(
-            (self.cognito_user_pool_id or "").strip()
-            and (self.cognito_app_client_id or "").strip()
+            (self.cognito_user_pool_id or "").strip() and (self.cognito_app_client_id or "").strip()
         )
 
     @property

@@ -105,9 +105,9 @@ For local and dev environments, the web service creates `S3_BUCKET` on startup i
 | http://localhost:8000/api/v1 | REST API (OpenAPI at `/docs`) |
 | http://localhost:8000/health | Health check (`db` + `redis` status) |
 
-When Cognito is not configured, the UI creates a private device workspace using a browser cookie
-(`rb_device_fingerprint`) and sends `X-Device-Fingerprint` on API calls. When Cognito is
-configured, visitors sign in through the configured login service; ResumeBild exchanges the
+In local environments without Cognito, the UI creates a private device workspace using a browser
+cookie (`rb_device_fingerprint`) and sends `X-Device-Fingerprint` on API calls. Production requires
+Cognito: visitors sign in through the configured login service, then ResumeBild exchanges the
 returned ID token for its own HttpOnly session cookies and never shares browser tokens across
 subdomains.
 
@@ -127,7 +127,7 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 | `PUBLIC_BASE_URL` | No | Public origin for the Cognito return callback. Default: `http://localhost:8000` |
 | `AUTH_LOGIN_URL` | No | Login endpoint that receives the validated `return_url` during Cognito handoff |
 | `AUTH_RETURN_ALLOWLIST` | No | Comma-separated allowed callback origins. Include `PUBLIC_BASE_URL` in production. |
-| `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION` | Optional | Enable Cognito authentication. Leave the pool ID and client ID empty for local device-based authentication. |
+| `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION` | Required in production | Enable Cognito authentication. Leave the pool ID and client ID empty only for local device-based authentication. |
 | `S3_ENDPOINT` | Local | Set to `http://minio:9000` for MinIO; leave empty for AWS S3 |
 | `S3_BUCKET` | Yes | Bucket name, default `resume-builder` |
 | `S3_PREFIX` | No | Prefix applied to every object key, for sharing a bucket between deployments |
