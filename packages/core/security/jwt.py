@@ -99,6 +99,8 @@ async def register_user(session: AsyncSession, email: str, password: str) -> Use
 async def authenticate_user(session: AsyncSession, email: str, password: str) -> User | None:
     result = await session.execute(select(User).where(User.email == email.lower()))
     user = result.scalar_one_or_none()
-    if user is None or not verify_password(password, user.password_hash):
+    if user is None or not user.password_hash:
+        return None
+    if not verify_password(password, user.password_hash):
         return None
     return user

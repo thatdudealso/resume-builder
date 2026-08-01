@@ -23,7 +23,8 @@ async def health(session: AsyncSession = Depends(get_db)):
         await r.ping()
     except Exception:
         redis_ok = False
-    status = "ok" if db_ok and redis_ok else "degraded"
+    # Redis is optional (in-memory rate-limit fallback). DB is required for readiness.
+    status = "ok" if db_ok else "degraded"
     return {"status": status, "db": db_ok, "redis": redis_ok}
 
 

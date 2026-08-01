@@ -534,6 +534,10 @@ def index_page() -> None:
             billing_resp = await client.get("/api/v1/billing/status")
             resumes_resp = await client.get("/api/v1/resumes")
 
+        if user_resp.status_code == 401:
+            # Cognito hard-gate: send the browser through 5432wire login handoff.
+            ui.navigate.to("/api/v1/auth/login-redirect")
+            return
         if user_resp.status_code != 200:
             status_label.set_text("Device workspace unavailable. Refresh this page.")
             return

@@ -69,6 +69,14 @@ async def test_run_stream_progress(client, monkeypatch):
         lambda f, d: "SUMMARY\nEngineer\nEXPERIENCE\nBuilt systems.",
     )
     monkeypatch.setattr("apps.web.api.v1.resumes.upload_bytes", lambda k, d, c: k)
+
+    async def _noop_background(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "apps.web.services.run_launcher.execute_run_background",
+        _noop_background,
+    )
     upload = await client.post(
         "/api/v1/resumes",
         files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},

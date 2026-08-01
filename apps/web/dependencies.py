@@ -10,6 +10,8 @@ from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from apps.web.config import settings
+from packages.core.security.cognito import decode_cognito_jwt
 from packages.core.security.jwt import ACCESS_COOKIE, decode_access_token, hash_ip
 from packages.core.security.passwords import hash_password
 from packages.db.models.device_session import DeviceSession
@@ -21,8 +23,6 @@ _redis: redis.Redis | None = None
 
 async def get_redis() -> redis.Redis:
     global _redis
-    from apps.web.config import settings
-
     if _redis is None:
         _redis = redis.from_url(settings.redis_url, decode_responses=True)
     return _redis
@@ -88,22 +88,67 @@ async def _get_or_create_device_user_id(request: Request, session: AsyncSession)
     return user.id
 
 
+async def get_or_create_cognito_user(session: AsyncSession, payload: dict) -> User:
+    cognito_sub = str(payload["sub"])
+    email = str(payload.get("email") or f"cognito-{cognito_sub}@resume-builder.local").lower()
+    result = await session.execute(select(User).where(User.cognito_sub == cognito_sub))
+    user = result.scalar_one_or_none()
+    if user is not None:
+        if email and user.email != email and not user.email.endswith("@resume-builder.local"):
+            pass
+        elif email and user.email.startswith("cognito-"):
+            user.email = email
+        return user
+
+    by_email = await session.execute(select(User).where(User.email == email))
+    existing = by_email.scalar_one_or_none()
+    if existing is not None:
+        existing.cognito_sub = cognito_sub
+        return existing
+
+    user = User(
+        email=email,
+        password_hash=None,
+        cognito_sub=cognito_sub,
+    )
+    session.add(user)
+    await session.flush()
+    return user
+
+
+def _extract_bearer(request: Request) -> str | None:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:].strip() or None
+    return None
+
+
 async def get_current_user_id(
     request: Request,
     session: AsyncSession = Depends(get_db),
     access_token: str | None = Cookie(default=None, alias=ACCESS_COOKIE),
 ) -> UUID:
-    token = access_token
-    if not token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
-    if not token:
-        return await _get_or_create_device_user_id(request, session)
-    user_id = await decode_access_token(token)
-    if user_id is None:
+    token = access_token or request.cookies.get(ACCESS_COOKIE) or _extract_bearer(request)
+
+    if token:
+        # Prefer ResumeBild session cookies / local JWTs.
+        user_id = await decode_access_token(token)
+        if user_id is not None:
+            return user_id
+
+        if settings.cognito_enabled:
+            payload = decode_cognito_jwt(token)
+            if payload is not None:
+                user = await get_or_create_cognito_user(session, payload)
+                await session.commit()
+                return user.id
+
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return user_id
+
+    if settings.cognito_enabled:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    return await _get_or_create_device_user_id(request, session)
 
 
 async def get_current_user(
