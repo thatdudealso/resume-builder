@@ -12,6 +12,13 @@ from apps.web.dependencies import get_redis
 
 # Process-local fallback used when Redis is unavailable (single App Runner instance).
 _memory_counts: dict[str, tuple[int, float]] = {}
+_INCREMENT_WITH_EXPIRY = """
+local count = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) == -1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
 
 
 def reset_memory_rate_limits() -> None:
@@ -22,9 +29,7 @@ def reset_memory_rate_limits() -> None:
 async def _increment(key: str, window: int) -> int:
     try:
         r = await get_redis()
-        count = await r.incr(key)
-        if count == 1:
-            await r.expire(key, window)
+        count = await r.eval(_INCREMENT_WITH_EXPIRY, 1, key, window)
         return int(count)
     except Exception:
         now = time.time()

@@ -7,6 +7,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
+export AWS_REGION
+export AWS_DEFAULT_REGION="${AWS_REGION}"
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 ECR_REPO="${ECR_REPO:-resumebild-backend}"
 ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
@@ -145,7 +147,7 @@ SOURCE_CONFIG=$(cat <<EOF
       "RuntimeEnvironmentVariables": {
         "ENV": "production",
         "DEPLOY_ENV": "production",
-        "COGNITO_REGION": "us-east-1",
+        "COGNITO_REGION": "${AWS_REGION}",
         "PUBLIC_BASE_URL": "https://${DOMAIN}",
         "AUTH_LOGIN_URL": "https://5432wire.com/login",
         "AUTH_RETURN_ALLOWLIST": "https://${DOMAIN}",

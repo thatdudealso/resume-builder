@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
+
+from apps.web.dependencies import get_or_create_cognito_user
+from packages.core.security.jwt import register_user
+from packages.db.models.user import User
 
 
 @pytest.mark.asyncio
@@ -40,7 +45,7 @@ async def test_cognito_exchange_sets_cookies(client, monkeypatch):
 
     def fake_decode(token: str):
         assert token.startswith("good-token")
-        return {"sub": "cognito-sub-1", "email": "crew@example.com"}
+        return {"sub": "cognito-sub-1", "email": "crew@example.com", "email_verified": True}
 
     monkeypatch.setattr("apps.web.api.v1.auth.decode_cognito_jwt", fake_decode)
     resp = await client.post(
@@ -56,6 +61,22 @@ async def test_cognito_exchange_sets_cookies(client, monkeypatch):
     # Cookies issued after the handoff must remain scoped to ResumeBild rather
     # than sharing browser tokens with 5432wire subdomains.
     assert "domain=" not in cookie_header
+
+
+@pytest.mark.asyncio
+async def test_unverified_cognito_email_does_not_link_existing_user(session):
+    existing = await register_user(session, "victim@example.com", "password123")
+    await session.flush()
+
+    user = await get_or_create_cognito_user(
+        session,
+        {"sub": "unverified-sub", "email": "victim@example.com", "email_verified": False},
+    )
+
+    assert user.id != existing.id
+    assert user.email == "cognito-unverified-sub@resume-builder.local"
+    result = await session.execute(select(User).where(User.id == existing.id))
+    assert result.scalar_one().cognito_sub is None
 
 
 @pytest.mark.asyncio

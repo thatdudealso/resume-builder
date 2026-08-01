@@ -90,7 +90,9 @@ async def _get_or_create_device_user_id(request: Request, session: AsyncSession)
 
 async def get_or_create_cognito_user(session: AsyncSession, payload: dict[str, Any]) -> User:
     cognito_sub = str(payload["sub"])
-    email = str(payload.get("email") or f"cognito-{cognito_sub}@resume-builder.local").lower()
+    email_verified = payload.get("email_verified") is True
+    claimed_email = str(payload.get("email") or "").lower()
+    email = claimed_email if email_verified and claimed_email else f"cognito-{cognito_sub}@resume-builder.local"
     result = await session.execute(select(User).where(User.cognito_sub == cognito_sub))
     user = result.scalar_one_or_none()
     if user is not None:
@@ -100,11 +102,12 @@ async def get_or_create_cognito_user(session: AsyncSession, payload: dict[str, A
             user.email = email
         return user
 
-    by_email = await session.execute(select(User).where(User.email == email))
-    existing = by_email.scalar_one_or_none()
-    if existing is not None:
-        existing.cognito_sub = cognito_sub
-        return existing
+    if email_verified:
+        by_email = await session.execute(select(User).where(User.email == email))
+        existing = by_email.scalar_one_or_none()
+        if existing is not None:
+            existing.cognito_sub = cognito_sub
+            return existing
 
     user = User(
         email=email,
