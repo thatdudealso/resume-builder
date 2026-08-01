@@ -40,3 +40,7 @@ or be supplied interactively into `aws secretsmanager put-secret-value` outside 
 ## Stale artifacts
 
 `task-definition.json` describes a previous ECS+ALB plan and must not be used for this deploy.
+
+## Outbound internet
+
+App Runner VPC egress uses private subnets. A small `t4g.nano` NAT instance (`resumebild-nat`) provides outbound access for OpenAI/Cognito JWKS without a NAT Gateway.
