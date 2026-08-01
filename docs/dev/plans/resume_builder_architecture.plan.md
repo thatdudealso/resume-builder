@@ -34,6 +34,9 @@ isProject: false
 
 # Resume Builder — Final Production Engineering Plan
 
+> The AWS production sections below are a historical ECS proposal. The authoritative ResumeBild
+> production deployment is the App Runner guide at `infra/aws/README.md`.
+
 ## 0. Branch Strategy and Repository Governance (NEW)
 
 ### Branch hierarchy

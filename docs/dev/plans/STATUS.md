@@ -1,6 +1,6 @@
 # Resume Builder — Implementation Status
 
-**Last updated:** 2026-06-17
+**Last updated:** 2026-08-01
 **Integration branch:** `develop`
 **Production branch:** `main` (promoted from `qa` only)
 
@@ -17,7 +17,7 @@
 | Exports TXT/DOCX/PDF | Done |
 | Test coverage gate | **≥85%** (107 tests after PR #3) |
 | CI workflows | Committed (Docker CI unverified locally) |
-| AWS deploy artifacts | Skeleton only |
+| AWS deploy artifacts | App Runner production tooling - see `infra/aws/README.md` |
 
 ## Plan todos
 
@@ -35,7 +35,7 @@
 | database-schema-export | `docs/database/schema.sql`, ER diagram, CI verify | **Not started** | `feature/database-schema-export` |
 | e2e-agent-tests | Full agent E2E in Docker for `qa` gate | **Not started** | `feature/e2e-agent-tests` |
 | github-branch-protection | Branch protection rules doc + `gh` script | **Not started** | `feature/github-branch-protection` |
-| aws-deploy | ECS, RDS, ElastiCache, ALB | **Partial** | → `feature/aws-infra-full` |
+| aws-deploy | App Runner, RDS, shared S3, Secrets Manager, Cognito handoff | **Implemented** | `infra/aws/README.md` |
 
 ## Active feature branches (from `develop`)
 
@@ -49,7 +49,7 @@ Work **only** on `feature/*` branches; open PRs into `develop`.
 | `feature/database-schema-export` | `docs/database/schema.sql` export, ER diagram, `verify_docs` CI check | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + optional `gh` setup script | Not started |
-| `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager per env | Not started |
+| `feature/resumebild-apprunner-live` | App Runner production provisioning, Cognito handoff, shared S3 prefix | Implemented |
 
 ## Current open PR context (2026-06-17)
 

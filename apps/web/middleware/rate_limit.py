@@ -10,6 +10,42 @@ from starlette.responses import JSONResponse, Response
 from apps.web.config import settings
 from apps.web.dependencies import get_redis
 
+# Process-local fallback used when Redis is unavailable (single App Runner instance).
+_memory_counts: dict[str, tuple[int, float]] = {}
+_INCREMENT_WITH_EXPIRY = """
+local count = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) == -1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
+
+
+def reset_memory_rate_limits() -> None:
+    """Test helper to clear in-memory rate-limit state."""
+    _memory_counts.clear()
+
+
+async def _increment(key: str, window: int) -> int:
+    try:
+        r = await get_redis()
+        count = await r.eval(_INCREMENT_WITH_EXPIRY, 1, key, window)
+        return int(count)
+    except Exception:
+        now = time.time()
+        count, expires_at = _memory_counts.get(key, (0, 0.0))
+        if expires_at <= now:
+            count = 0
+            expires_at = now + window
+        count += 1
+        _memory_counts[key] = (count, expires_at)
+        # Opportunistic cleanup to keep the fallback map bounded.
+        if len(_memory_counts) > 2048:
+            stale = [k for k, (_, exp) in _memory_counts.items() if exp <= now]
+            for stale_key in stale:
+                _memory_counts.pop(stale_key, None)
+        return count
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     LIMITS = {
@@ -50,22 +86,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_ip = request.client.host if request.client else "unknown"
         key = f"rl:{endpoint_class}:{client_ip}:{int(time.time()) // window}"
 
-        try:
-            r = await get_redis()
-            count = await r.incr(key)
-            if count == 1:
-                await r.expire(key, window)
-            if count > limit:
-                return JSONResponse(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    content={"detail": "Rate limit exceeded"},
-                )
-        except Exception:
-            if endpoint_class == "agent_run_create":
-                return JSONResponse(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    content={"detail": "Rate limiter unavailable"},
-                )
+        count = await _increment(key, window)
+        if count > limit:
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={"detail": "Rate limit exceeded"},
+            )
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(limit)

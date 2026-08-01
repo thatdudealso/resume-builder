@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from apps.web.api.router import api_router, health_router
+from apps.web.auth_callback import AUTH_CALLBACK_HTML
 from apps.web.config import settings
 from apps.web.middleware.device_fingerprint import DeviceFingerprintMiddleware
 from apps.web.middleware.rate_limit import RateLimitMiddleware
@@ -42,6 +44,11 @@ def create_app() -> FastAPI:
     app.add_middleware(DeviceFingerprintMiddleware)
     app.include_router(api_router)
     app.include_router(health_router)
+
+    @app.get("/auth/callback", response_class=HTMLResponse, include_in_schema=False)
+    async def auth_callback_page() -> HTMLResponse:
+        return HTMLResponse(AUTH_CALLBACK_HTML)
+
     return app
 
 

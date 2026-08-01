@@ -79,6 +79,10 @@ async def client(engine, monkeypatch) -> AsyncGenerator[AsyncClient, None]:
     class FakeRedis:
         store: dict = {}
 
+        async def eval(self, _script: str, _numkeys: int, key: str, _ttl: int) -> int:
+            self.store[key] = self.store.get(key, 0) + 1
+            return self.store[key]
+
         async def incr(self, key: str) -> int:
             self.store[key] = self.store.get(key, 0) + 1
             return self.store[key]

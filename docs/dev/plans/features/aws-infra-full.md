@@ -1,5 +1,8 @@
 # feature/aws-infra-full
 
+> Superseded for ResumeBild production by the App Runner deployment guide at
+> `infra/aws/README.md`. This retained feature plan records the earlier ECS proposal.
+
 ## Goal
 
 Deployable AWS infrastructure for dev, qa, and prod environments.

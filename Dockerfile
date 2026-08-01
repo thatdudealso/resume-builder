@@ -14,9 +14,11 @@ COPY migrations migrations
 COPY alembic.ini ./
 COPY scripts scripts
 
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir -e ".[dev]" \
+    && chmod +x /app/scripts/entrypoint.sh
 
 ENV PYTHONPATH=/app
 EXPOSE 8000
 
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 CMD ["uvicorn", "apps.web.main:app", "--host", "0.0.0.0", "--port", "8000"]

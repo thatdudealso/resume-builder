@@ -15,7 +15,10 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cognito_sub: Mapped[str | None] = mapped_column(
+        String(128), unique=True, nullable=True, index=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     free_trial_used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
