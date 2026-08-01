@@ -214,18 +214,20 @@ aws apprunner associate-custom-domain \
   --no-enable-www-subdomain >/dev/null 2>&1 || true
 
 DOMAIN_INFO="$(aws apprunner describe-custom-domains --service-arn "${SERVICE_ARN}" --output json)"
-echo "${DOMAIN_INFO}" | python3 - <<'PY'
-import json,sys
-info=json.load(sys.stdin)
-domains=info.get("CustomDomains") or []
+python3 -c '
+import json
+import sys
+
+info = json.load(sys.stdin)
+domains = info.get("CustomDomains") or []
 if not domains:
     print("No custom domain association found yet")
     raise SystemExit(0)
-d=domains[0]
-print(f"custom_domain_status={d.get('Status')}")
+d = domains[0]
+print("custom_domain_status={}".format(d.get("Status")))
 for rec in d.get("CertificateValidationRecords") or []:
-    print(f"validation_cname={rec.get('Name')}->{rec.get('Value')}")
-PY
+    print("validation_cname={}->{}".format(rec.get("Name"), rec.get("Value")))
+' <<<"${DOMAIN_INFO}"
 
 # Upsert the App Runner custom-domain and certificate-validation CNAME records.
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID:-Z04820823MQE3EMJX7VND}"
