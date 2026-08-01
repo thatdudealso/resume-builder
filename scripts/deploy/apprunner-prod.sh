@@ -124,7 +124,7 @@ if [[ -z "${SERVICE_ARN}" || "${SERVICE_ARN}" == "None" ]]; then
     --service-name "${SERVICE_NAME}" \
     --source-configuration "${SOURCE_CONFIG}" \
     --instance-configuration "${INSTANCE_CONFIG}" \
-    --network-configuration "EgressConfig={EgressType=VPC,VpcConnectorArn=${CONNECTOR_ARN}}" \
+    --network-configuration "EgressConfiguration={EgressType=VPC,VpcConnectorArn=${CONNECTOR_ARN}}" \
     --health-check-configuration 'Protocol=HTTP,Path=/ready,Interval=10,Timeout=5,HealthyThreshold=1,UnhealthyThreshold=5' \
     --query Service.ServiceArn --output text)"
 else
@@ -133,7 +133,7 @@ else
     --service-arn "${SERVICE_ARN}" \
     --source-configuration "${SOURCE_CONFIG}" \
     --instance-configuration "${INSTANCE_CONFIG}" \
-    --network-configuration "EgressConfig={EgressType=VPC,VpcConnectorArn=${CONNECTOR_ARN}}" >/dev/null
+    --network-configuration "EgressConfiguration={EgressType=VPC,VpcConnectorArn=${CONNECTOR_ARN}}" >/dev/null
 fi
 
 echo "==> Waiting for service running"
