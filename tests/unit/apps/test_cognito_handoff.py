@@ -50,7 +50,12 @@ async def test_cognito_exchange_sets_cookies(client, monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     assert body["email"] == "crew@example.com"
-    assert "access_token=" in resp.headers.get("set-cookie", "")
+    cookie_header = resp.headers.get("set-cookie", "").lower()
+    assert "access_token=" in cookie_header
+    assert "httponly" in cookie_header
+    # Cookies issued after the handoff must remain scoped to ResumeBild rather
+    # than sharing browser tokens with 5432wire subdomains.
+    assert "domain=" not in cookie_header
 
 
 @pytest.mark.asyncio

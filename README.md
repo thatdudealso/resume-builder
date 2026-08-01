@@ -29,6 +29,7 @@ The rest of this README is the operator manual: running the app locally, configu
 - [Prerequisites](#prerequisites)
 - [Quick start (Docker - recommended)](#quick-start-docker---recommended)
 - [Configure environment variables](#configure-environment-variables)
+- [AWS production deployment](#aws-production-deployment)
 - [MinIO bucket bootstrap](#4-minio-bucket-bootstrap)
 - [Use the app](#use-the-app)
 - [LLM providers](#llm-providers)
@@ -100,12 +101,15 @@ For local and dev environments, the web service creates `S3_BUCKET` on startup i
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:8000/app | Main workflow (upload → tailor → optional paywall → export) |
-| http://localhost:8000/app/dashboard | Advanced dashboard (provider picker, variants, section editor) |
+| http://localhost:8000/app | Tailoring workflow (upload, provider picker, variants, section editor, and export) |
 | http://localhost:8000/api/v1 | REST API (OpenAPI at `/docs`) |
 | http://localhost:8000/health | Health check (`db` + `redis` status) |
 
-No login is required. The UI creates a private device workspace using a browser cookie (`rb_device_fingerprint`) and sends `X-Device-Fingerprint` on API calls.
+When Cognito is not configured, the UI creates a private device workspace using a browser cookie
+(`rb_device_fingerprint`) and sends `X-Device-Fingerprint` on API calls. When Cognito is
+configured, visitors sign in through the configured login service; ResumeBild exchanges the
+returned ID token for its own HttpOnly session cookies and never shares browser tokens across
+subdomains.
 
 ---
 
@@ -115,13 +119,18 @@ Copy `.env.example` to `.env`. Values below use Docker Compose service hostnames
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ENV` | No | `local`, `dev`, `qa`, `prod`, or `test`. Default: `local` |
+| `ENV` | No | `local`, `dev`, `qa`, `production`, or `test`. Default: `local` |
 | `DATABASE_URL` | Yes | Async SQLAlchemy URL, e.g. `postgresql+asyncpg://resume:resume@postgres:5432/resume_builder` |
-| `REDIS_URL` | Yes | e.g. `redis://redis:6379/0` |
+| `REDIS_URL` | No | e.g. `redis://redis:6379/0`. If Redis is unavailable, rate limiting falls back to process memory. |
 | `JWT_SECRET` | Yes | Min 32 characters; used for JWT and NiceGUI session storage |
 | `CORS_ORIGINS` | No | Comma-separated origins. Default: `http://localhost:8000` |
+| `PUBLIC_BASE_URL` | No | Public origin for the Cognito return callback. Default: `http://localhost:8000` |
+| `AUTH_LOGIN_URL` | No | Login endpoint that receives the validated `return_url` during Cognito handoff |
+| `AUTH_RETURN_ALLOWLIST` | No | Comma-separated allowed callback origins. Include `PUBLIC_BASE_URL` in production. |
+| `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION` | Optional | Enable Cognito authentication. Leave the pool ID and client ID empty for local device-based authentication. |
 | `S3_ENDPOINT` | Local | Set to `http://minio:9000` for MinIO; leave empty for AWS S3 |
 | `S3_BUCKET` | Yes | Bucket name, default `resume-builder` |
+| `S3_PREFIX` | No | Prefix applied to every object key, for sharing a bucket between deployments |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | Yes | MinIO: `minioadmin` / `minioadmin` |
 | `S3_REGION` | No | Default `us-east-1` |
 | `OPENAI_API_KEY` | Recommended | OpenAI (default provider; `OPENAI_BASE_URL` defaults to OpenAI API) |
@@ -142,6 +151,13 @@ Never commit `.env` or real API keys to git.
 
 ---
 
+## AWS production deployment
+
+The App Runner deployment, required Secrets Manager values, Cognito redirect handoff, and shared
+S3 bucket configuration are documented in [the AWS production guide](infra/aws/README.md).
+
+---
+
 ## Use the app
 
 ### Main workflow (`/app`)
@@ -153,17 +169,14 @@ Never commit `.env` or real API keys to git.
 5. When payments are enabled, pay via Stripe or crypto, then poll until the webhook unlocks the run.
 6. Export to PDF or DOCX when output is unlocked.
 
-### Advanced dashboard (`/app/dashboard`)
-
-Same backend, richer UI: LLM provider selection, match scores, variant tabs, section editor, and changelog. Link from the main page or go directly.
-
 ### API overview
 
-All protected routes accept `X-Device-Fingerprint` (no JWT required for the NiceGUI flow).
+When Cognito is configured, protected routes use ResumeBild's app-only session cookies. Otherwise,
+the NiceGUI flow uses `X-Device-Fingerprint` for its private device workspace.
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/v1/auth/me` | GET | Device workspace state (free trial, uploads) |
+| `/api/v1/auth/me` | GET | Current workspace state (free trial, uploads) |
 | `/api/v1/resumes` | GET, POST | List / upload resumes |
 | `/api/v1/runs` | POST | Start a tailoring run |
 | `/api/v1/runs/{id}` | GET | Run status and output (respects lock) |
@@ -180,7 +193,7 @@ Interactive API docs: http://localhost:8000/docs
 
 ## LLM providers
 
-Supported providers (selectable on `/app` and the dashboard; default is OpenAI):
+Supported providers (selectable in `/app`; default is OpenAI):
 
 | Provider | Env var | Notes |
 |----------|---------|-------|
@@ -191,7 +204,7 @@ Supported providers (selectable on `/app` and the dashboard; default is OpenAI):
 
 If a provider's API key is missing, the agent uses deterministic mock completions so the app still runs locally - useful for UI testing, not for real tailoring.
 
-**Minimum for real runs:** set `OPENAI_API_KEY` (or configure another provider and choose it on the dashboard).
+**Minimum for real runs:** set `OPENAI_API_KEY` (or configure another provider and choose it in the app).
 
 Get an OpenAI API key: https://platform.openai.com/api-keys
 
@@ -375,7 +388,7 @@ resume-builder/
 ├── apps/web/                 # FastAPI app + NiceGUI UI
 │   ├── main.py               # Application entrypoint
 │   ├── api/v1/               # REST routes
-│   └── ui/                   # NiceGUI pages (/app, /app/dashboard)
+│   └── ui/                   # NiceGUI workflow mounted at /app
 ├── packages/
 │   ├── agent/                # LangGraph workflow + LLM providers
 │   ├── core/                 # Auth, access/paywall, security
@@ -425,7 +438,7 @@ Engineering plans and status (private dev docs) live on `develop` under `docs/de
 ### Agent runs complete but output looks like placeholder text
 
 - No LLM API key is configured. Add `OPENAI_API_KEY` or another provider key and restart.
-- On the dashboard, confirm the selected provider is configured.
+- In the app, confirm the selected provider is configured.
 
 ### Paywall does not unlock after Stripe payment
 

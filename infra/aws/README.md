@@ -23,19 +23,15 @@ or be supplied interactively into `aws secretsmanager put-secret-value` outside 
 
 ## Runtime env (from Secrets Manager / App Runner)
 
-| Key | Notes |
-|-----|-------|
-| `ENV` | `production` |
-| `DATABASE_URL` | `postgresql+asyncpg://.../resumebild` |
-| `JWT_SECRET` | app-only session cookies (not Cognito) |
-| `OPENAI_API_KEY` | from managed secret |
-| `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION` | shared 5432wire pool |
-| `PUBLIC_BASE_URL` | `https://resumebild.5432wire.com` |
-| `AUTH_LOGIN_URL` | `https://5432wire.com/login` |
-| `AUTH_RETURN_ALLOWLIST` | `https://resumebild.5432wire.com` |
-| `S3_BUCKET` / `S3_PREFIX` / `S3_REGION` | shared bucket + `resumebild` prefix |
-| `CORS_ORIGINS` | `https://resumebild.5432wire.com` |
-| `REDIS_URL` | optional; leave unset / unreachable for in-memory limiter |
+The deployment script maps the app configuration described in the
+[environment-variable reference](../../README.md#configure-environment-variables) to App Runner.
+Store `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, Cognito pool/client IDs, and `S3_BUCKET` in
+`resumebild/production/app`; it supplies the production origin, `resumebild` S3 prefix, and
+unreachable Redis endpoint needed to exercise the in-memory limiter.
+
+The Cognito handoff validates the ResumeBild callback origin, sends the Cognito ID token in the
+callback URL fragment, then exchanges it on ResumeBild for app-only HttpOnly cookies. Do not
+configure a shared cookie domain or pass Cognito browser tokens between subdomains.
 
 ## Stale artifacts
 

@@ -25,7 +25,7 @@ resume-builder/
 │       ├── config.py                # Settings (pydantic-settings, reads .env)
 │       ├── dependencies.py          # FastAPI dependency injectors
 │       ├── middleware/
-│       │   ├── rate_limit.py        # Redis-backed per-endpoint limits
+│       │   ├── rate_limit.py        # Redis limits with an in-process fallback
 │       │   └── security_headers.py  # CSP, HSTS, X-Frame-Options
 │       ├── api/
 │       │   ├── router.py            # Registers all v1 routers
@@ -261,31 +261,9 @@ Defined in `packages/agent/state.py` as `AgentState(TypedDict, total=False)`:
 - Webhooks: `POST /webhooks/stripe`, `POST /webhooks/crypto`
 
 ### Environment variables
-| Variable | Example value | Notes |
-|----------|--------------|-------|
-| `ENV` | `local \| dev \| qa \| prod` | Controls cookie security, log level |
-| `DATABASE_URL` | `postgresql+asyncpg://resume:resume@postgres/resume_builder` | asyncpg driver for SQLAlchemy |
-| `REDIS_URL` | `redis://redis:6379/0` | |
-| `JWT_SECRET` | 32+ random chars | |
-| `JWT_ACCESS_EXPIRE_MINUTES` | `15` | |
-| `JWT_REFRESH_EXPIRE_DAYS` | `7` | |
-| `OPENAI_API_KEY` / `OPENAI_BASE_URL` | `sk-...` | OpenAI provider (default provider) |
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | Anthropic provider |
-| `GEMINI_API_KEY` | | Gemini provider |
-| `XAI_API_KEY` / `XAI_BASE_URL` | | Grok provider |
-| `STRIPE_SECRET_KEY` | `sk_live_...` | |
-| `STRIPE_PUBLISHABLE_KEY` | `pk_live_...` | Used by NiceGUI Checkout redirect |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Signature verification |
-| `STRIPE_PRICE_ID` | `price_...` | One-time $3.99 |
-| `NOWPAYMENTS_API_KEY` | | |
-| `NOWPAYMENTS_IPN_SECRET` | | HMAC secret |
-| `PAYMENTS_ENABLED` | `true \| false` | Empty auto-derives from Stripe/NOWPayments keys |
-| `SUPPORT_URL` | `https://...` | Shown as one subtle support link when payments are off |
-| `S3_ENDPOINT` | `http://minio:9000` | Empty = AWS S3 |
-| `S3_BUCKET` | `resume-builder` | |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | | |
-| `RUN_UNLOCK_PRICE_USD` | `3.99` | |
-| `APP_VERSION` / `DEPLOYED_AT` / `DEPLOY_ENV` | | Surfaced via `/api/v1/deployments/latest` |
+
+`README.md` is the authoritative environment-variable reference. For production App Runner
+values and deployment mechanics, see `infra/aws/README.md`.
 
 ---
 
@@ -580,7 +558,7 @@ monkeypatch.setattr("apps.web.services.run_executor.get_checkpointer", fake_get_
 | `feature/docker-ci-verify` | Validate `docker-compose.test.yml` in CI; fix image/test gaps | Not started |
 | `feature/e2e-agent-tests` | Full agent E2E in Docker for `qa` promotion gate | Not started |
 | `feature/github-branch-protection` | Branch protection rules doc + `gh` setup script | Not started |
-| `feature/aws-infra-full` | Terraform/CDK: RDS, ElastiCache, S3, ALB, Secrets Manager | Not started |
+| `feature/resumebild-apprunner-live` | App Runner production provisioning, Cognito handoff, shared S3 prefix | Implemented |
 
 > **UI architecture note:** The app is single-page only — one `@ui.page("/")` mounted at `/app/`. There is no `/app/dashboard` route. All output, scores, and fit assessment are on the same page. Scores are shown as a teaser even on locked runs using the `ats_score_before`/`ats_score_after` fields returned unconditionally by the API.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from collections.abc import AsyncGenerator
+from typing import Any
 from uuid import UUID
 
 import redis.asyncio as redis
@@ -88,7 +89,7 @@ async def _get_or_create_device_user_id(request: Request, session: AsyncSession)
     return user.id
 
 
-async def get_or_create_cognito_user(session: AsyncSession, payload: dict) -> User:
+async def get_or_create_cognito_user(session: AsyncSession, payload: dict[str, Any]) -> User:
     cognito_sub = str(payload["sub"])
     email = str(payload.get("email") or f"cognito-{cognito_sub}@resume-builder.local").lower()
     result = await session.execute(select(User).where(User.cognito_sub == cognito_sub))
