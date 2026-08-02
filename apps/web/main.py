@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from apps.web.api.router import api_router, health_router
 from apps.web.auth_callback import AUTH_CALLBACK_HTML
@@ -20,6 +20,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
+
+# NiceGUI is mounted at /app; public marketing URLs hit /. Without this redirect,
+# FastAPI returns application/json {"detail":"Not Found"} and browsers show raw JSON.
+_PUBLIC_UI_PATH = "/app/"
 
 
 @asynccontextmanager
@@ -44,6 +48,10 @@ def create_app() -> FastAPI:
     app.add_middleware(DeviceFingerprintMiddleware)
     app.include_router(api_router)
     app.include_router(health_router)
+
+    @app.get("/", include_in_schema=False)
+    async def public_root() -> RedirectResponse:
+        return RedirectResponse(url=_PUBLIC_UI_PATH, status_code=307)
 
     @app.get("/auth/callback", response_class=HTMLResponse, include_in_schema=False)
     async def auth_callback_page() -> HTMLResponse:

@@ -277,6 +277,35 @@ for record in custom_domain.get("CertificateValidationRecords") or []:
 print(json.dumps({"Comment": f"ResumeBild App Runner DNS for {domain}", "Changes": changes}))
 PY
 )"
-aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch "${ROUTE53_CHANGE_BATCH}" >/dev/null
+ROUTE53_CHANGE_ID="$(aws route53 change-resource-record-sets \
+  --hosted-zone-id "${HOSTED_ZONE_ID}" \
+  --change-batch "${ROUTE53_CHANGE_BATCH}" \
+  --query 'ChangeInfo.Id' --output text)"
+
+echo "==> Waiting for DNS records to propagate"
+aws route53 wait resource-record-sets-changed --id "${ROUTE53_CHANGE_ID}"
+
+echo "==> Waiting for custom domain ${DOMAIN} to become active"
+for i in $(seq 1 60); do
+  DOMAIN_STATUS="$(aws apprunner describe-custom-domains \
+    --service-arn "${SERVICE_ARN}" \
+    --query "CustomDomains[?DomainName=='${DOMAIN}'].Status | [0]" --output text)"
+  echo "custom_domain_status=${DOMAIN_STATUS}"
+  if [[ "${DOMAIN_STATUS}" == "ACTIVE" ]]; then
+    break
+  fi
+  if [[ "${DOMAIN_STATUS}" == *FAILED ]]; then
+    echo "Custom domain entered ${DOMAIN_STATUS}" >&2
+    exit 1
+  fi
+  if [[ "${i}" == "60" ]]; then
+    echo "Timed out waiting for custom domain ${DOMAIN} to become active" >&2
+    exit 1
+  fi
+  sleep 15
+done
+
+echo "==> Smoke testing https://${DOMAIN}"
+SMOKE_TEST_URL="https://${DOMAIN}" bash scripts/deploy/smoke_test.sh
 
 echo "Done. Verify: curl -fsS https://${DOMAIN}/health"

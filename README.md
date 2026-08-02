@@ -101,7 +101,8 @@ For local and dev environments, the web service creates `S3_BUCKET` on startup i
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:8000/app | Tailoring workflow (upload, provider picker, variants, section editor, and export) |
+| http://localhost:8000/ | Public entry point; redirects to the tailoring workflow at `/app/` |
+| http://localhost:8000/app/ | Tailoring workflow (upload, provider picker, variants, section editor, and export) |
 | http://localhost:8000/api/v1 | REST API (OpenAPI at `/docs`) |
 | http://localhost:8000/health | Health check (`db` + `redis` status) |
 
