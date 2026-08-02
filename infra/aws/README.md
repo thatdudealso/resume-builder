@@ -16,7 +16,9 @@
 # Build and push a linux/amd64 image, then ensure the ECR repo, App Runner
 # service, custom domain, Route53 CNAME records, VPC connector, and per-runtime
 # Secrets Manager secrets for the existing resumebild database connection. The script waits
-# for the custom domain to become active and smoke-tests the public root redirect to `/app/`.
+# for the custom domain to become active, verifies the public root redirect to `/app/`, and
+# uses a headless browser to confirm the automatic Cognito handoff reaches 5432wire login with
+# a `return_url` rather than a mount-prefixed NiceGUI 404.
 bash scripts/deploy/apprunner-prod.sh
 ```
 
