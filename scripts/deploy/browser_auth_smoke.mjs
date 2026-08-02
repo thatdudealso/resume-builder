@@ -22,14 +22,13 @@ page.on("framenavigated", (frame) => {
 try {
   await page.goto(`${base}/`, { waitUntil: "domcontentloaded", timeout: timeoutMs });
 
-  // Wait until auth handoff leaves /app/api/... (bug) or reaches login / stable UI.
+  // Wait until auth handoff reaches its terminal state or the prefixed-route bug.
   await page.waitForFunction(
     () => {
       const href = location.href;
       if (href.includes("/app/api/v1/auth/login-redirect")) return true;
       if (href.includes("/login") && href.includes("return_url=")) return true;
-      const body = document.body ? document.body.innerText : "";
-      return /ResumeBild/i.test(body) && /Tailor your resume|Preparing device workspace|Sign/i.test(body);
+      return false;
     },
     { timeout: timeoutMs },
   );
@@ -44,12 +43,11 @@ try {
   const httpException404 =
     /HTTPException/i.test(bodyText) ||
     (/404/i.test(bodyText) && /Not Found|page/i.test(bodyText) && badPrefixed);
-  const landedOnLogin = /\/login/.test(finalUrl) && /return_url=/.test(finalUrl);
-  const stayedOnApp =
-    /\/app\/?([?#]|$)/.test(new URL(finalUrl).pathname) &&
-    /ResumeBild/i.test(bodyText) &&
-    !badPrefixed &&
-    !/HTTPException/i.test(bodyText);
+  const finalLocation = new URL(finalUrl);
+  const landedOnLogin =
+    finalLocation.hostname === "5432wire.com" &&
+    /^\/login\/?$/.test(finalLocation.pathname) &&
+    finalLocation.searchParams.has("return_url");
 
   const report = {
     finalUrl,
@@ -57,7 +55,6 @@ try {
     badPrefixed,
     httpException404,
     landedOnLogin,
-    stayedOnApp,
     bodySnippet: bodyText.slice(0, 400),
   };
   console.log(JSON.stringify(report, null, 2));
@@ -66,8 +63,8 @@ try {
     console.error("FAIL: browser navigated to mount-prefixed /app/api/v1/auth/login-redirect");
     process.exit(1);
   }
-  if (!(landedOnLogin || stayedOnApp)) {
-    console.error("FAIL: browser did not remain usable after automatic auth handling");
+  if (!landedOnLogin) {
+    console.error("FAIL: browser did not reach the 5432wire login handoff with return_url");
     process.exit(1);
   }
   console.log("Browser auth smoke passed.");
