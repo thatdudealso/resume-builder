@@ -34,4 +34,26 @@ if printf '%s' "${UI_BODY}" | grep -q '{"detail":"Not Found"}'; then
   exit 1
 fi
 
+# Browser: automatic Cognito auth must not land on /app/api/v1/... NiceGUI 404.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if ! command -v npm >/dev/null 2>&1; then
+  echo "FAIL: npm is required for browser auth smoke" >&2
+  exit 1
+fi
+echo "==> Browser auth smoke against ${URL}"
+BROWSER_SMOKE_DIR="$(mktemp -d)"
+cleanup_browser_smoke() {
+  rm -f "${ROOT_HEADERS}" "${ROOT_BODY}"
+  rm -rf "${BROWSER_SMOKE_DIR}"
+}
+trap cleanup_browser_smoke EXIT
+# ESM resolves packages from the script directory; run inside a temp install.
+cp "${ROOT_DIR}/scripts/deploy/browser_auth_smoke.mjs" "${BROWSER_SMOKE_DIR}/browser_auth_smoke.mjs"
+npm install --prefix "${BROWSER_SMOKE_DIR}" --silent playwright@1.62.0
+"${BROWSER_SMOKE_DIR}/node_modules/.bin/playwright" install chromium >/dev/null
+(
+  cd "${BROWSER_SMOKE_DIR}"
+  SMOKE_TEST_URL="${URL}" node ./browser_auth_smoke.mjs
+)
+
 echo "Smoke tests passed."

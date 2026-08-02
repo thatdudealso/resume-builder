@@ -247,7 +247,9 @@ custom_domain = next(
     (item for item in info.get("CustomDomains") or [] if item.get("DomainName", "").rstrip(".") == domain),
     None,
 )
-if custom_domain is None or not custom_domain.get("DNSTarget"):
+# describe-custom-domains returns DNSTarget at the response root, not per domain.
+dns_target = (custom_domain or {}).get("DNSTarget") or info.get("DNSTarget")
+if custom_domain is None or not dns_target:
     raise SystemExit(f"App Runner did not return a DNS target for {domain}")
 
 def cname(name, value):
@@ -269,7 +271,7 @@ for record in existing:
     if record.get("Type") in {"A", "AAAA"}:
         changes.append({"Action": "DELETE", "ResourceRecordSet": record})
 
-changes.append({"Action": "UPSERT", "ResourceRecordSet": cname(domain, custom_domain["DNSTarget"])})
+changes.append({"Action": "UPSERT", "ResourceRecordSet": cname(domain, dns_target)})
 for record in custom_domain.get("CertificateValidationRecords") or []:
     if record.get("Name") and record.get("Value"):
         changes.append({"Action": "UPSERT", "ResourceRecordSet": cname(record["Name"], record["Value"])})
@@ -291,10 +293,12 @@ for i in $(seq 1 60); do
     --service-arn "${SERVICE_ARN}" \
     --query "CustomDomains[?DomainName=='${DOMAIN}'].Status | [0]" --output text)"
   echo "custom_domain_status=${DOMAIN_STATUS}"
-  if [[ "${DOMAIN_STATUS}" == "ACTIVE" ]]; then
+  # App Runner returns "active" (lowercase) once the association is ready.
+  DOMAIN_STATUS_NORM="$(printf '%s' "${DOMAIN_STATUS}" | tr '[:upper:]' '[:lower:]')"
+  if [[ "${DOMAIN_STATUS_NORM}" == "active" ]]; then
     break
   fi
-  if [[ "${DOMAIN_STATUS}" == *FAILED ]]; then
+  if [[ "${DOMAIN_STATUS_NORM}" == *failed* ]]; then
     echo "Custom domain entered ${DOMAIN_STATUS}" >&2
     exit 1
   fi
