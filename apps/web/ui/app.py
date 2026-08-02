@@ -13,7 +13,7 @@ from apps.web.services.run_launcher import (
     create_run_record,
     execute_run_background,
 )
-from apps.web.ui.auth_guard import api_client
+from apps.web.ui.auth_guard import api_client, login_redirect_url
 from apps.web.ui.console_log import log_console
 from apps.web.ui.request_auth import request_user_session
 from apps.web.ui.run_progress import watch_run_progress
@@ -536,7 +536,8 @@ def index_page() -> None:
 
         if user_resp.status_code == 401:
             # Cognito hard-gate: send the browser through 5432wire login handoff.
-            ui.navigate.to("/api/v1/auth/login-redirect")
+            # Must be origin-absolute so NiceGUI does not prefix the /app mount.
+            ui.navigate.to(login_redirect_url())
             return
         if user_resp.status_code != 200:
             status_label.set_text("Device workspace unavailable. Refresh this page.")
