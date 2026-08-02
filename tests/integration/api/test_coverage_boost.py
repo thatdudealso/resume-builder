@@ -116,6 +116,8 @@ async def test_export_locked_and_download(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_stream_and_unlock(client, monkeypatch):
+    import asyncio
+
     await client.post(
         "/api/v1/auth/register",
         json={"email": "stream@test.com", "password": "password123"},
@@ -131,6 +133,8 @@ async def test_run_stream_and_unlock(client, monkeypatch):
         files={"file": ("r.txt", io.BytesIO(b"data"), "text/plain")},
     )
     resume_id = upload.json()["resume_id"]
+
+    background_completed = asyncio.Event()
 
     async def bg(run_id, variant=None):
         from apps.web.services.run_executor import get_run_queue
@@ -148,6 +152,7 @@ async def test_run_stream_and_unlock(client, monkeypatch):
                 run.output_locked = True
                 run.preview_text = "Preview content"
                 await s.commit()
+        background_completed.set()
 
     monkeypatch.setattr("apps.web.services.run_launcher.execute_run_background", bg)
     run_resp = await client.post(
@@ -155,9 +160,7 @@ async def test_run_stream_and_unlock(client, monkeypatch):
         json={"resume_id": resume_id, "jd_text": "Python developer " * 5},
     )
     run_id = run_resp.json()["run_id"]
-    import asyncio
-
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(background_completed.wait(), timeout=1)
     stream = await client.get(f"/api/v1/runs/{run_id}/stream")
     assert stream.status_code == 200
     assert "event:" in stream.text
